@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -9,16 +10,25 @@ import 'features/auth/presentation/auth_state.dart';
 import 'features/auth/presentation/login_page.dart';
 
 class InspecaoCampoApp extends StatelessWidget {
-  const InspecaoCampoApp({required this.authRepository, super.key});
+  const InspecaoCampoApp({
+    required this.dio,
+    required this.authRepository,
+    required this.sessionExpired,
+    super.key,
+  });
 
+  /// Mesma instância usada por todas as features — carrega o interceptor.
+  final Dio dio;
   final AuthRepository authRepository;
+  final Stream<void> sessionExpired;
 
   @override
   Widget build(BuildContext context) {
     return RepositoryProvider.value(
       value: authRepository,
       child: BlocProvider(
-        create: (_) => AuthBloc(authRepository)..add(const AuthStatusChecked()),
+        create: (_) => AuthBloc(authRepository, sessionExpired: sessionExpired)
+          ..add(const AuthStatusChecked()),
         child: MaterialApp(
           title: 'Inspeção de Campo',
           debugShowCheckedModeBanner: false,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/error/failures.dart';
@@ -6,13 +8,19 @@ import 'auth_event.dart';
 import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
-  AuthBloc(this._repository) : super(const AuthInitial()) {
+  AuthBloc(this._repository, {Stream<void>? sessionExpired})
+      : super(const AuthInitial()) {
     on<AuthStatusChecked>(_onStatusChecked);
     on<AuthLoginRequested>(_onLoginRequested);
     on<AuthLogoutRequested>(_onLogoutRequested);
+
+    // O interceptor anuncia 401 em rota protegida; a sessão cai aqui.
+    _sessionSubscription =
+        sessionExpired?.listen((_) => add(const AuthLogoutRequested()));
   }
 
   final AuthRepository _repository;
+  StreamSubscription<void>? _sessionSubscription;
 
   Future<void> _onStatusChecked(
     AuthStatusChecked event,
@@ -54,5 +62,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     await _repository.logout();
     emit(const AuthUnauthenticated());
+  }
+
+  @override
+  Future<void> close() {
+    // Sem isto o bloc sobrevive à remoção da árvore, preso pela inscrição.
+    _sessionSubscription?.cancel();
+    return super.close();
   }
 }
