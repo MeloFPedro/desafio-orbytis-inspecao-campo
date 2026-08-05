@@ -4,4 +4,9 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- A API mock roda em HTTP puro (10.0.2.2:3000) e o Android 9+ bloqueia
+         tráfego cleartext por padrão. Liberado somente em debug: o build de
+         release continua exigindo HTTPS. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>
