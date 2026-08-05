@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 /// Erro de domínio: algo que a UI pode exibir e a fila de sync pode classificar.
-abstract class Failure extends Equatable {
+abstract class Failure extends Equatable implements Exception {
   const Failure(this.message);
 
   final String message;
@@ -50,6 +50,14 @@ class ValidationFailure extends Failure {
 
   @override
   List<Object?> get props => [message, errors];
+}
+
+/// 404 — recurso inexistente (ex.: GET /work-orders/:id).
+class NotFoundFailure extends Failure {
+  const NotFoundFailure([super.message = 'Registro não encontrado.']);
+
+  @override
+  bool get isPermanent => true;
 }
 
 /// 409 — workOrderId inexistente no servidor.
