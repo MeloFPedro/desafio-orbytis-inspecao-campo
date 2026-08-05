@@ -1,0 +1,91 @@
+{
+  "users": [
+    {
+      "id": "u_001",
+      "name": "Ana Técnica",
+      "email": "tecnico@orbytis.com.br",
+      "password": "123456",
+      "role": "field_technician"
+    },
+    {
+      "id": "u_002",
+      "name": "Bruno Admin",
+      "email": "admin@orbytis.com.br",
+      "password": "admin123",
+      "role": "admin"
+    }
+  ],
+  "workOrders": [
+    {
+      "id": "wo_1001",
+      "code": "OS-2026-001",
+      "title": "Inspeção de poste — Rua das Acácias",
+      "description": "Verificar estado do poste e conexões aparentes.",
+      "address": "Rua das Acácias, 120 — João Pessoa/PB",
+      "priority": "high",
+      "status": "open",
+      "latitude": -7.1195,
+      "longitude": -34.845,
+      "scheduledAt": "2026-07-28T13:00:00.000Z",
+      "updatedAt": "2026-07-26T12:00:00.000Z",
+      "notes": "Cliente relatou oscilação noturna."
+    },
+    {
+      "id": "wo_1002",
+      "code": "OS-2026-002",
+      "title": "Vistoria de caixa de passagem",
+      "description": "Conferir tampa, limpeza e identificação.",
+      "address": "Av. Epitácio Pessoa, 800 — João Pessoa/PB",
+      "priority": "medium",
+      "status": "open",
+      "latitude": -7.115,
+      "longitude": -34.863,
+      "scheduledAt": "2026-07-28T15:30:00.000Z",
+      "updatedAt": "2026-07-26T12:05:00.000Z",
+      "notes": ""
+    },
+    {
+      "id": "wo_1003",
+      "code": "OS-2026-003",
+      "title": "Checagem de ramal — Bairro Manaíra",
+      "description": "Registrar evidência fotográfica e condições do ramal.",
+      "address": "Rua Joaquim Torres, 45 — João Pessoa/PB",
+      "priority": "low",
+      "status": "in_progress",
+      "latitude": -7.0988,
+      "longitude": -34.8336,
+      "scheduledAt": "2026-07-29T09:00:00.000Z",
+      "updatedAt": "2026-07-26T12:10:00.000Z",
+      "notes": "Retorno de visita anterior."
+    },
+    {
+      "id": "wo_1004",
+      "code": "OS-2026-004",
+      "title": "Inspeção de transformador",
+      "description": "Avaliar ruídos, vazamentos e sinalização de segurança.",
+      "address": "Rua Duarte da Silveira, 200 — João Pessoa/PB",
+      "priority": "high",
+      "status": "open",
+      "latitude": -7.1262,
+      "longitude": -34.8731,
+      "scheduledAt": "2026-07-29T11:00:00.000Z",
+      "updatedAt": "2026-07-26T12:15:00.000Z",
+      "notes": "Área com pedestres — atenção à sinalização."
+    },
+    {
+      "id": "wo_1005",
+      "code": "OS-2026-005",
+      "title": "Validação pós-manutenção",
+      "description": "Confirmar serviço concluído e coletar assinatura visual (foto).",
+      "address": "Av. Dom Pedro II, 1500 — João Pessoa/PB",
+      "priority": "medium",
+      "status": "done",
+      "latitude": -7.1219,
+      "longitude": -34.8821,
+      "scheduledAt": "2026-07-25T16:00:00.000Z",
+      "updatedAt": "2026-07-25T17:30:00.000Z",
+      "notes": "OS já encerrada no backoffice; útil para testes de filtro."
+    }
+  ],
+  "inspections": []
+}

@@ -1,0 +1,17 @@
+{
+  "name": "orbytis-desafio-flutter-mock-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mock API for Orbytis Flutter hiring challenge",
+  "scripts": {
+    "start": "node server.js",
+    "reset": "cp db/db.seed.json db/db.json"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "json-server": "^0.17.4",
+    "multer": "^1.4.5-lts.2",
+    "uuid": "^11.1.0"
+  }
+}
