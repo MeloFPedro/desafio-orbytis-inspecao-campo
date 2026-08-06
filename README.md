@@ -84,7 +84,75 @@ npm start
 
 ## Arquitetura
 
-_Em construção._
+### Organização por feature
+
+```
+app/lib/
+├── main.dart              # monta o grafo de dependências
+├── app.dart               # providers e roteamento por estado de autenticação
+├── core/                  # transversal às features
+│   ├── error/             # tipos de falha e tradução de erros HTTP
+│   ├── network/           # cliente Dio e interceptor de autenticação
+│   └── database/          # persistência local
+└── features/
+    ├── auth/
+    ├── work_orders/
+    ├── inspections/
+    └── sync/
+```
+
+A organização é **por feature**, não por camada. Tudo que muda junto fica junto: alterar
+o fluxo de inspeção significa abrir uma pasta, não quatro. O agrupamento por tipo
+(`blocs/`, `models/`, `screens/`) funciona em app pequeno e degrada conforme cresce.
+
+### Camadas dentro de cada feature
+
+| Camada | Responsabilidade | Conhece |
+|---|---|---|
+| `domain/` | modelos e regras de negócio | nada |
+| `data/` | acesso a API e persistência | `domain` |
+| `presentation/` | blocs e telas | `data`, `domain` |
+
+A dependência aponta sempre para dentro. O `domain` não importa Dio nem Flutter, o que
+o torna testável sem infraestrutura.
+
+### Fluxo de dados
+
+```
+UI ──evento──► Bloc ──► Repository ──► Api ──► Dio ──► rede
+▲                │
+└─────estado─────┘
+```
+
+A UI nunca chama repositório: ela dispara eventos e reconstrói a partir do estado.
+Consequência prática: toda a lógica é testável sem construir widgets.
+
+A camada `Api` conhece apenas HTTP — rotas, status, JSON — e devolve dados crus. Traduzir
+para objetos de domínio é trabalho do repositório. Isso permite trocar a biblioteca de
+rede sem tocar em nada acima.
+
+### Injeção de dependência
+
+Sem biblioteca de service locator. O `main.dart` constrói os repositórios uma única vez e
+o `flutter_bloc` os distribui pela árvore via `RepositoryProvider`; os blocs vêm de
+`BlocProvider`, que cuida do ciclo de vida e chama `close()` automaticamente.
+
+Os blocs de feature são criados **dentro** do ramo autenticado da árvore. Assim nascem no
+login e são descartados no logout, sem que dados de uma sessão sobrevivam à seguinte.
+
+### Autenticação
+
+`AuthInterceptor` injeta `Authorization: Bearer <token>` em todas as rotas exceto
+`/auth/login`, e detecta `401` em rota protegida.
+
+Um `401` não é erro da tela que fez a chamada — é a sessão que expirou. O tratamento é
+centralizado: o interceptor anuncia num `StreamController`, o `AuthBloc` escuta e derruba
+a sessão, e o app inteiro volta ao login. Sem isso, cada bloc precisaria tratar o caso por
+conta própria, com mensagens divergentes para a mesma causa.
+
+O stream também resolve uma dependência circular: `AuthBloc → AuthRepository → AuthApi →
+Dio → AuthInterceptor`. O interceptor não conhece o bloc; apenas anuncia, e quem quiser
+escuta.
 
 ## Fila de sincronização
 
@@ -160,8 +228,50 @@ A permissão `android:usesCleartextTraffic="true"` está em
 `android/app/src/debug/AndroidManifest.xml`, não no manifesto principal. O mock roda em
 HTTP puro, mas builds de release continuam exigindo HTTPS.
 
+### Carga inicial e refresh são eventos distintos
+
+`WorkOrdersRequested` e `WorkOrdersRefreshed` fazem a mesma chamada, mas a tela reage
+diferente: a carga inicial mostra spinner de tela cheia; o refresh mantém a lista visível
+e deixa o `RefreshIndicator` sinalizar. Com um evento único, o pull-to-refresh apagaria a
+lista por um instante a cada atualização.
+
+### Lista vazia não é um estado
+
+`WorkOrdersLoaded` com zero itens é um resultado válido, não uma situação distinta. Um
+estado `Empty` separado duplicaria a lógica de transição apenas para diferenciar "chegou
+uma lista" de "chegou uma lista sem itens". A tela decide o que desenhar.
+
+### Conclusão de operação ≠ mudança de estado
+
+O `RefreshIndicator` exige um `Future` que complete quando a atualização termina. A
+primeira implementação aguardava a próxima emissão do bloc — e travava.
+
+O motivo: o bloc descarta estados iguais ao atual. Um refresh que traz dados idênticos é
+uma operação concluída **sem** emissão, e o indicador girava indefinidamente. O bug só
+aparece com dados estáticos, que é justamente o caso do mock.
+
+A correção foi o evento carregar um `Completer`, completado pelo handler num `finally`.
+O indicador passa a acompanhar a operação, não o estado.
+
+### Valores desconhecidos de enum não derrubam o parsing
+
+`WorkOrderPriority` e `WorkOrderStatus` têm um caso `unknown` usado como fallback. Se a API
+devolver um valor não previsto, aquela OS aparece marcada como desconhecida em vez de
+quebrar a lista inteira. Num app de campo, mostrar dado parcial é preferível a mostrar
+tela de erro.
+
+Pelo mesmo motivo, coordenadas são lidas como `num` antes de virar `double`: JSON não
+distingue `-7` de `-7.0`, e `as double` falharia sobre um inteiro.
+
 ---
 
 ## Limitações conhecidas
 
-_Em construção._
+- **A lista de ordens de serviço não é persistida localmente.** Sem conexão, a tela exibe
+  erro em vez dos últimos dados conhecidos. Com mais tempo, o repositório serviria do banco
+  local e a rede seria apenas atualização.
+- **Sem paginação.** O mock devolve cinco registros; uma carga real exigiria paginação ou
+  carregamento incremental.
+- **O token não é renovado.** A API mock não expõe refresh token, então a expiração leva
+  ao login. Em produção, um interceptor tentaria renovar antes de derrubar a sessão.
+- **Sem testes automatizados até o momento.**
