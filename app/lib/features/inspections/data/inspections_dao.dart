@@ -66,15 +66,23 @@ class InspectionsDao {
   /// `failed` fica de fora de propósito — é erro permanente e só volta à fila
   /// por ação explícita do usuário, que devolve o registro para `pending`.
   ///
+  /// [ignoreBackoff] é usado pela sincronização manual: o adiamento existe
+  /// para conter a fila automática, não para bloquear uma decisão do usuário.
+  ///
   /// Ordena por `createdAt` para preservar a cronologia do trabalho de campo.
-  Future<List<Inspection>> dueForSync(DateTime now) {
+  Future<List<Inspection>> dueForSync(
+    DateTime now, {
+    bool ignoreBackoff = false,
+  }) {
     return (_db.select(_db.inspections)
-          ..where(
-            (t) =>
-                t.syncStatus.equalsValue(SyncStatus.pending) &
+          ..where((t) {
+            final isPending = t.syncStatus.equalsValue(SyncStatus.pending);
+            if (ignoreBackoff) return isPending;
+
+            return isPending &
                 (t.nextAttemptAt.isNull() |
-                    t.nextAttemptAt.isSmallerOrEqualValue(now)),
-          )
+                    t.nextAttemptAt.isSmallerOrEqualValue(now));
+          })
           ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
         .get();
   }

@@ -18,6 +18,15 @@ enum SyncStatus {
   failed,
 }
 
+extension SyncStatusLabel on SyncStatus {
+  String get label => switch (this) {
+        SyncStatus.draft => 'Rascunho',
+        SyncStatus.pending => 'Pendente',
+        SyncStatus.synced => 'Sincronizada',
+        SyncStatus.failed => 'Falhou',
+      };
+}
+
 class Inspections extends Table {
   /// UUID gerado no dispositivo. É a chave de idempotência do contrato:
   /// reenvios usam o mesmo valor e o servidor não duplica.

@@ -61,14 +61,18 @@ class SyncService {
 
   bool get isRunning => _running;
 
-  Future<SyncResult> syncNow() async {
+  /// [force] ignora o backoff. Usado pela sincronização manual: o adiamento
+  /// protege contra a fila automática martelar um servidor que está falhando,
+  /// não contra uma decisão deliberada do técnico — que costuma saber algo
+  /// que o app não sabe, como o Wi-Fi ter acabado de voltar.
+  Future<SyncResult> syncNow({bool force = false}) async {
     // Retorna de imediato em vez de aguardar: enfileirar chamadas produziria
     // uma cascata de sincronizações quando a primeira terminasse.
     if (_running) return const SyncResult(skipped: true);
     _running = true;
 
     try {
-      final due = await _dao.dueForSync(DateTime.now());
+      final due = await _dao.dueForSync(DateTime.now(), ignoreBackoff: force);
 
       var synced = 0;
       var failed = 0;
@@ -128,6 +132,8 @@ class SyncService {
       return _Outcome.failed;
     }
 
+    final attempts = inspection.retryCount + 1;
+
     try {
       final result = await _api.create(
         clientId: inspection.clientId,
@@ -140,22 +146,23 @@ class SyncService {
         photo: photo,
       );
 
-      await _markSynced(inspection, result['id'] as String?);
+      await _markSynced(inspection, result['id'] as String?, attempts);
       return _Outcome.synced;
     } on UnauthorizedFailure {
-      // Sessão expirada não é falha da inspeção. Nada é marcado.
+      // Sessão expirada não é falha da inspeção: nada é marcado, e o contador
+      // também não avança — a resposta não diz nada sobre este registro.
       return _Outcome.sessionExpired;
     } on Failure catch (failure) {
       if (failure.isPermanent) {
-        await _markFailed(inspection, failure.message);
+        await _markFailed(inspection, failure.message, attempts: attempts);
         return _Outcome.failed;
       }
 
-      final attempts = inspection.retryCount + 1;
       if (attempts >= _maxAttempts) {
         await _markFailed(
           inspection,
           '${failure.message} (após $attempts tentativas)',
+          attempts: attempts,
         );
         return _Outcome.failed;
       }
@@ -165,12 +172,19 @@ class SyncService {
     }
   }
 
-  Future<void> _markSynced(Inspection inspection, String? serverId) {
+  /// [attempts] inclui a tentativa bem-sucedida: o contador registra quantas
+  /// idas à rede este registro custou, não quantas falharam.
+  Future<void> _markSynced(
+    Inspection inspection,
+    String? serverId,
+    int attempts,
+  ) {
     return _dao.updateFields(
       inspection.clientId,
       InspectionsCompanion(
         syncStatus: const Value(SyncStatus.synced),
         serverId: Value(serverId),
+        retryCount: Value(attempts),
         lastError: const Value<String?>(null),
         nextAttemptAt: const Value<DateTime?>(null),
         updatedAt: Value(DateTime.now()),
@@ -178,11 +192,21 @@ class SyncService {
     );
   }
 
-  Future<void> _markFailed(Inspection inspection, String message) {
+  /// [attempts] é informado quando houve tentativa de envio de fato.
+  ///
+  /// Falhas detectadas antes de sair do dispositivo — foto ausente, registro
+  /// incompleto — deixam o contador intacto: nenhuma requisição foi feita.
+  Future<void> _markFailed(
+    Inspection inspection,
+    String message, {
+    int? attempts,
+  }) {
     return _dao.updateFields(
       inspection.clientId,
       InspectionsCompanion(
         syncStatus: const Value(SyncStatus.failed),
+        retryCount:
+            attempts == null ? const Value.absent() : Value(attempts),
         lastError: Value(message),
         nextAttemptAt: const Value<DateTime?>(null),
         updatedAt: Value(DateTime.now()),

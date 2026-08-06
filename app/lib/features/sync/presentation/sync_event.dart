@@ -12,7 +12,17 @@ class SyncRequested extends SyncEvent {
   const SyncRequested();
 }
 
-/// Conectividade voltou ou a tela abriu. Silencioso.
+/// A tela de histórico abriu. Silencioso e respeita o backoff.
 class SyncAutoTriggered extends SyncEvent {
   const SyncAutoTriggered();
+}
+
+/// Conectividade voltou. Silencioso, mas **ignora o backoff**.
+///
+/// O adiamento foi calculado sob a premissa de que a rede estava ruim, e uma
+/// interface voltando é informação nova que invalida essa premissa. A proteção
+/// não se perde: se o servidor estiver fora do ar com a rede de pé, nenhum
+/// evento de conectividade é emitido e o backoff segue valendo.
+class SyncConnectivityRestored extends SyncEvent {
+  const SyncConnectivityRestored();
 }

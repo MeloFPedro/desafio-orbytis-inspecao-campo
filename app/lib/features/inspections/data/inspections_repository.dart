@@ -61,6 +61,23 @@ class InspectionsRepository {
     return id;
   }
 
+  /// Devolve uma inspeção `failed` para a fila.
+  ///
+  /// Zera o contador de tentativas: é uma nova decisão do técnico, não a
+  /// continuação da sequência anterior de falhas.
+  Future<void> retry(String clientId) {
+    return _dao.updateFields(
+      clientId,
+      InspectionsCompanion(
+        syncStatus: const Value(SyncStatus.pending),
+        retryCount: const Value(0),
+        nextAttemptAt: const Value<DateTime?>(null),
+        lastError: const Value<String?>(null),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   /// Marca a inspeção como pronta para envio.
   ///
   /// Lança [ValidationFailure] se estiver incompleta — as mesmas regras que a

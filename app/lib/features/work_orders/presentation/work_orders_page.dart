@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../auth/presentation/auth_bloc.dart';
 import '../../auth/presentation/auth_event.dart';
 import '../../inspections/presentation/inspection_form_page.dart';
+import '../../sync/presentation/sync_history_page.dart';
 import '../domain/work_order.dart';
 import 'work_orders_bloc.dart';
 import 'work_orders_event.dart';
@@ -20,6 +21,13 @@ class WorkOrdersPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Ordens de serviço'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Histórico',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SyncHistoryPage()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sair',
