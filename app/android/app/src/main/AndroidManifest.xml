@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- CAMERA é exigida pelo image_picker mesmo para ImageSource.gallery.
+         Sem ela a captura falha em silêncio: nenhum erro, nenhum log útil. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
     <application
         android:label="inspecao_campo"
         android:name="${applicationName}"

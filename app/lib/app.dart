@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'core/location/location_service.dart';
+import 'core/media/photo_service.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/auth_bloc.dart';
 import 'features/auth/presentation/auth_event.dart';
@@ -17,6 +19,8 @@ class InspecaoCampoApp extends StatelessWidget {
     required this.authRepository,
     required this.workOrdersRepository,
     required this.inspectionsRepository,
+    required this.photoService,
+    required this.locationService,
     required this.sessionExpired,
     super.key,
   });
@@ -24,6 +28,8 @@ class InspecaoCampoApp extends StatelessWidget {
   final AuthRepository authRepository;
   final WorkOrdersRepository workOrdersRepository;
   final InspectionsRepository inspectionsRepository;
+  final PhotoService photoService;
+  final LocationService locationService;
   final Stream<void> sessionExpired;
 
   @override
@@ -35,6 +41,8 @@ class InspecaoCampoApp extends StatelessWidget {
         // Acima do MaterialApp de propósito: telas abertas por Navigator.push
         // nascem sob o Navigator e só enxergam providers acima dele.
         RepositoryProvider.value(value: inspectionsRepository),
+        RepositoryProvider.value(value: photoService),
+        RepositoryProvider.value(value: locationService),
       ],
       child: BlocProvider(
         create: (_) => AuthBloc(authRepository, sessionExpired: sessionExpired)

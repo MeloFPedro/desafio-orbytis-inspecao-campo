@@ -68,6 +68,21 @@ class ConflictFailure extends Failure {
   bool get isPermanent => true;
 }
 
+/// Falha ao obter localização: serviço desligado, permissão negada ou sem sinal.
+class LocationFailure extends Failure {
+  const LocationFailure(super.message, {this.canOpenSettings = false});
+
+  /// Verdadeiro quando o usuário negou permanentemente e só as configurações
+  /// do sistema resolvem — o Android para de exibir o diálogo de permissão.
+  final bool canOpenSettings;
+
+  @override
+  bool get isPermanent => true;
+
+  @override
+  List<Object?> get props => [message, canOpenSettings];
+}
+
 /// Qualquer coisa não prevista.
 class UnknownFailure extends Failure {
   const UnknownFailure([super.message = 'Ocorreu um erro inesperado.']);
