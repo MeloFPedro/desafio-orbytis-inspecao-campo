@@ -6,6 +6,7 @@ import 'features/auth/presentation/auth_bloc.dart';
 import 'features/auth/presentation/auth_event.dart';
 import 'features/auth/presentation/auth_state.dart';
 import 'features/auth/presentation/login_page.dart';
+import 'features/inspections/data/inspections_repository.dart';
 import 'features/work_orders/data/work_orders_repository.dart';
 import 'features/work_orders/presentation/work_orders_bloc.dart';
 import 'features/work_orders/presentation/work_orders_event.dart';
@@ -15,12 +16,14 @@ class InspecaoCampoApp extends StatelessWidget {
   const InspecaoCampoApp({
     required this.authRepository,
     required this.workOrdersRepository,
+    required this.inspectionsRepository,
     required this.sessionExpired,
     super.key,
   });
 
   final AuthRepository authRepository;
   final WorkOrdersRepository workOrdersRepository;
+  final InspectionsRepository inspectionsRepository;
   final Stream<void> sessionExpired;
 
   @override
@@ -29,6 +32,9 @@ class InspecaoCampoApp extends StatelessWidget {
       providers: [
         RepositoryProvider.value(value: authRepository),
         RepositoryProvider.value(value: workOrdersRepository),
+        // Acima do MaterialApp de propósito: telas abertas por Navigator.push
+        // nascem sob o Navigator e só enxergam providers acima dele.
+        RepositoryProvider.value(value: inspectionsRepository),
       ],
       child: BlocProvider(
         create: (_) => AuthBloc(authRepository, sessionExpired: sessionExpired)

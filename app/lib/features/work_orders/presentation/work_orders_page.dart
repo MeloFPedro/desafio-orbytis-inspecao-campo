@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../auth/presentation/auth_bloc.dart';
 import '../../auth/presentation/auth_event.dart';
+import '../../inspections/presentation/inspection_form_page.dart';
 import '../domain/work_order.dart';
 import 'work_orders_bloc.dart';
 import 'work_orders_event.dart';
@@ -125,6 +126,11 @@ class _WorkOrderCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => InspectionFormPage(workOrder: order),
+          ),
+        ),
         title: Text(order.title, style: theme.textTheme.titleMedium),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
