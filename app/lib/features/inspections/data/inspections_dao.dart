@@ -35,6 +35,20 @@ class InspectionsDao {
         .getSingleOrNull();
   }
 
+  /// Rascunho aberto de uma OS, se houver. O técnico retoma de onde parou
+  /// em vez de criar uma inspeção nova a cada visita à tela.
+  Future<Inspection?> findDraftForWorkOrder(String workOrderId) {
+    return (_db.select(_db.inspections)
+          ..where(
+            (t) =>
+                t.workOrderId.equals(workOrderId) &
+                t.syncStatus.equalsValue(SyncStatus.draft),
+          )
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   /// Insere ou substitui — usado para gravar rascunho.
   Future<void> save(InspectionsCompanion entry) {
     return _db.into(_db.inspections).insertOnConflictUpdate(entry);

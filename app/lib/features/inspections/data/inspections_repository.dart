@@ -22,6 +22,9 @@ class InspectionsRepository {
   Future<Inspection?> findByClientId(String clientId) =>
       _dao.findByClientId(clientId);
 
+  Future<Inspection?> findDraftForWorkOrder(String workOrderId) =>
+      _dao.findDraftForWorkOrder(workOrderId);
+
   /// Cria ou atualiza um rascunho. Devolve o `clientId`.
   ///
   /// Rascunho não valida nada: o técnico pode salvar o que tiver e voltar
