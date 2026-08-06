@@ -49,6 +49,37 @@ class InspectionsDao {
         .getSingleOrNull();
   }
 
+  /// Estado local mais relevante por ordem de serviço.
+  ///
+  /// Quando há mais de uma inspeção para a mesma OS, prevalece a que exige
+  /// atenção — o técnico precisa ver a que falhou, não a que já subiu.
+  ///
+  /// A agregação fica em Dart e não em SQL: um GROUP BY com ordenação
+  /// customizada por prioridade de status seria bem mais difícil de ler, e a
+  /// tabela tem dezenas de linhas, não centenas de milhares.
+  Stream<Map<String, SyncStatus>> watchStatusByWorkOrder() {
+    return _db.select(_db.inspections).watch().map((rows) {
+      final result = <String, SyncStatus>{};
+
+      for (final row in rows) {
+        final current = result[row.workOrderId];
+        if (current == null ||
+            _attentionRank(row.syncStatus) > _attentionRank(current)) {
+          result[row.workOrderId] = row.syncStatus;
+        }
+      }
+
+      return result;
+    });
+  }
+
+  int _attentionRank(SyncStatus status) => switch (status) {
+        SyncStatus.synced => 0,
+        SyncStatus.draft => 1,
+        SyncStatus.pending => 2,
+        SyncStatus.failed => 3,
+      };
+
   /// Insere ou substitui — usado para gravar rascunho.
   Future<void> save(InspectionsCompanion entry) {
     return _db.into(_db.inspections).insertOnConflictUpdate(entry);

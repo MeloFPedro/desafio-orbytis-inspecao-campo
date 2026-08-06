@@ -19,6 +19,10 @@ class InspectionsRepository {
   Stream<List<Inspection>> watchByWorkOrder(String workOrderId) =>
       _dao.watchByWorkOrder(workOrderId);
 
+  /// Estado local mais relevante por ordem de serviço, para o selo na lista.
+  Stream<Map<String, SyncStatus>> watchStatusByWorkOrder() =>
+      _dao.watchStatusByWorkOrder();
+
   Future<Inspection?> findByClientId(String clientId) =>
       _dao.findByClientId(clientId);
 

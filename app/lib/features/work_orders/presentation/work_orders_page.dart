@@ -5,7 +5,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../auth/presentation/auth_bloc.dart';
 import '../../auth/presentation/auth_event.dart';
+import '../../../core/database/app_database.dart';
+import '../../inspections/data/inspections_repository.dart';
 import '../../inspections/presentation/inspection_form_page.dart';
+import '../../inspections/presentation/inspection_status_chip.dart';
 import '../../sync/presentation/sync_history_page.dart';
 import '../domain/work_order.dart';
 import 'work_orders_bloc.dart';
@@ -73,12 +76,26 @@ class _LoadedView extends StatelessWidget {
                 Center(child: Text('Nenhuma ordem de serviço atribuída.')),
               ],
             )
-          : ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(12),
-              itemCount: items.length,
-              itemBuilder: (context, index) =>
-                  _WorkOrderCard(order: items[index]),
+          // Estado local das inspeções por OS. Leitura puramente reativa:
+          // concluir uma inspeção e voltar já mostra o selo atualizado, sem
+          // recarregar a lista.
+          : StreamBuilder<Map<String, SyncStatus>>(
+              stream: context
+                  .read<InspectionsRepository>()
+                  .watchStatusByWorkOrder(),
+              builder: (context, snapshot) {
+                final statuses = snapshot.data ?? const <String, SyncStatus>{};
+
+                return ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(12),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) => _WorkOrderCard(
+                    order: items[index],
+                    inspectionStatus: statuses[items[index].id],
+                  ),
+                );
+              },
             ),
     );
   }
@@ -115,9 +132,13 @@ class _ErrorView extends StatelessWidget {
 }
 
 class _WorkOrderCard extends StatelessWidget {
-  const _WorkOrderCard({required this.order});
+  const _WorkOrderCard({required this.order, this.inspectionStatus});
 
   final WorkOrder order;
+
+  /// Estado local da inspeção desta OS, se houver alguma no dispositivo.
+  /// Eixo distinto do `status` da OS, que pertence ao servidor.
+  final SyncStatus? inspectionStatus;
 
   Color _priorityColor(BuildContext context) => switch (order.priority) {
         WorkOrderPriority.high => Colors.red.shade700,
@@ -148,6 +169,9 @@ class _WorkOrderCard extends StatelessWidget {
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
+              // Com três selos, telas estreitas quebram linha.
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Chip(
                   label: Text(order.priority.label),
@@ -158,6 +182,11 @@ class _WorkOrderCard extends StatelessWidget {
                   label: Text(order.status.label),
                   visualDensity: VisualDensity.compact,
                 ),
+                if (inspectionStatus != null)
+                  InspectionStatusChip(
+                    status: inspectionStatus!,
+                    prefix: 'Inspeção',
+                  ),
               ],
             ),
           ],

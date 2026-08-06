@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../inspections/data/inspections_repository.dart';
+import '../../inspections/presentation/inspection_status_chip.dart';
 import '../data/sync_service.dart';
 import 'sync_bloc.dart';
 import 'sync_event.dart';
@@ -205,7 +206,7 @@ class _InspectionCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                _StatusBadge(status: inspection.syncStatus),
+                InspectionStatusChip(status: inspection.syncStatus),
                 const Spacer(),
                 Text(inspection.workOrderId, style: theme.textTheme.bodySmall),
               ],
@@ -255,44 +256,3 @@ class _InspectionCard extends StatelessWidget {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
-
-  final SyncStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (status) {
-      SyncStatus.draft => Colors.grey.shade600,
-      SyncStatus.pending => Colors.orange.shade700,
-      SyncStatus.synced => Colors.green.shade700,
-      SyncStatus.failed => Colors.red.shade700,
-    };
-
-    final icon = switch (status) {
-      SyncStatus.draft => Icons.edit_note,
-      SyncStatus.pending => Icons.schedule,
-      SyncStatus.synced => Icons.cloud_done,
-      SyncStatus.failed => Icons.error_outline,
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            status.label,
-            style: TextStyle(color: color, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }
-}
