@@ -17,6 +17,9 @@ import 'features/work_orders/presentation/work_orders_bloc.dart';
 import 'features/work_orders/presentation/work_orders_event.dart';
 import 'features/work_orders/presentation/work_orders_page.dart';
 
+/// Necessário para desempilhar rotas de fora da árvore do Navigator.
+final _navigatorKey = GlobalKey<NavigatorState>();
+
 class InspecaoCampoApp extends StatelessWidget {
   const InspecaoCampoApp({
     required this.authRepository,
@@ -65,11 +68,21 @@ class InspecaoCampoApp extends StatelessWidget {
             create: (_) => SyncBloc(syncService, connectivity: connectivity),
           ),
         ],
-        child: MaterialApp(
-          title: 'Inspeção de Campo',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(colorSchemeSeed: Colors.indigo),
-          home: const _AuthGate(),
+        child: BlocListener<AuthBloc, AuthState>(
+          // Ao cair a sessão, desempilha tudo. Sem isto, o _AuthGate troca o
+          // conteúdo da rota raiz mas as telas abertas por Navigator.push
+          // permanecem por cima — o técnico veria o histórico sobre um login.
+          listenWhen: (previous, current) =>
+              previous is AuthAuthenticated && current is AuthUnauthenticated,
+          listener: (_, _) =>
+              _navigatorKey.currentState?.popUntil((route) => route.isFirst),
+          child: MaterialApp(
+            navigatorKey: _navigatorKey,
+            title: 'Inspeção de Campo',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(colorSchemeSeed: Colors.indigo),
+            home: const _AuthGate(),
+          ),
         ),
       ),
     );
