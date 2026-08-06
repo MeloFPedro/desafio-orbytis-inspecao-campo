@@ -8,6 +8,8 @@ import 'core/network/auth_interceptor.dart';
 import 'core/network/dio_client.dart';
 import 'features/auth/data/auth_api.dart';
 import 'features/auth/data/auth_repository.dart';
+import 'features/work_orders/data/work_orders_api.dart';
+import 'features/work_orders/data/work_orders_repository.dart';
 
 void main() {
   // Canal por onde o interceptor anuncia que a sessão morreu.
@@ -15,10 +17,12 @@ void main() {
   final sessionExpired = StreamController<void>.broadcast();
 
   final dio = createDioClient();
+
   final authRepository = AuthRepository(
     AuthApi(dio),
     const FlutterSecureStorage(),
   );
+  final workOrdersRepository = WorkOrdersRepository(WorkOrdersApi(dio));
 
   // Registrado depois do repositório: é o que quebra a dependência circular.
   dio.interceptors.add(
@@ -30,8 +34,8 @@ void main() {
 
   runApp(
     InspecaoCampoApp(
-      dio: dio,
       authRepository: authRepository,
+      workOrdersRepository: workOrdersRepository,
       sessionExpired: sessionExpired.stream,
     ),
   );
