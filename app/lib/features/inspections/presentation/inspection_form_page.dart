@@ -1,6 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/error/failures.dart';
+import '../../../core/location/location_service.dart';
+import '../../../core/media/photo_service.dart';
 import '../../work_orders/domain/work_order.dart';
 import '../data/inspections_repository.dart';
 import 'inspection_form_bloc.dart';
@@ -8,6 +13,9 @@ import 'inspection_form_event.dart';
 import 'inspection_form_state.dart';
 
 const _conditions = ['bom', 'regular', 'ruim', 'crítico'];
+
+/// Raio do geofence opcional: avisa, não bloqueia.
+const _geofenceRadiusMeters = 200.0;
 
 class InspectionFormPage extends StatelessWidget {
   const InspectionFormPage({required this.workOrder, super.key});
@@ -17,9 +25,11 @@ class InspectionFormPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => InspectionFormBloc(
+      create: (context) => InspectionFormBloc(
         context.read<InspectionsRepository>(),
-        workOrder.id,
+        context.read<PhotoService>(),
+        context.read<LocationService>(),
+        workOrderId: workOrder.id,
       )..add(const InspectionFormOpened()),
       child: _InspectionFormView(workOrder: workOrder),
     );
@@ -49,23 +59,41 @@ class _InspectionFormViewState extends State<_InspectionFormView> {
     super.dispose();
   }
 
-  void _saveDraft(BuildContext context) {
-    context.read<InspectionFormBloc>().add(
-          InspectionDraftSaved(
-            observation: _observationController.text,
-            condition: _condition,
-          ),
-        );
+  void _dispatch(BuildContext context, InspectionFormAction Function() build) {
+    context.read<InspectionFormBloc>().add(build());
   }
 
-  void _complete(BuildContext context) {
-    context.read<InspectionFormBloc>().add(
-          InspectionCompleteRequested(
-            observation: _observationController.text,
-            condition: _condition,
-          ),
-        );
-  }
+  void _saveDraft(BuildContext context) => _dispatch(
+        context,
+        () => InspectionDraftSaved(
+          observation: _observationController.text,
+          condition: _condition,
+        ),
+      );
+
+  void _complete(BuildContext context) => _dispatch(
+        context,
+        () => InspectionCompleteRequested(
+          observation: _observationController.text,
+          condition: _condition,
+        ),
+      );
+
+  void _capturePhoto(BuildContext context) => _dispatch(
+        context,
+        () => InspectionPhotoRequested(
+          observation: _observationController.text,
+          condition: _condition,
+        ),
+      );
+
+  void _captureLocation(BuildContext context) => _dispatch(
+        context,
+        () => InspectionLocationRequested(
+          observation: _observationController.text,
+          condition: _condition,
+        ),
+      );
 
   void _showMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -76,6 +104,64 @@ class _InspectionFormViewState extends State<_InspectionFormView> {
   String? _firstError(InspectionFormState state, String field) {
     final messages = state.errors[field];
     return (messages == null || messages.isEmpty) ? null : messages.join(', ');
+  }
+
+  /// Rótulo da localização, incluindo o aviso de geofence.
+  ///
+  /// O cálculo fica na tela porque é puramente informativo: um aviso de que o
+  /// técnico pode estar longe do ativo, derivado de dados que a tela já tem.
+  String? _locationLabel(BuildContext context, InspectionFormState state) {
+    final lat = state.draft?.latitude;
+    final lng = state.draft?.longitude;
+    if (lat == null || lng == null) return null;
+
+    final coords = '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
+
+    final distance = context.read<LocationService>().distanceBetween(
+          widget.workOrder.latitude,
+          widget.workOrder.longitude,
+          lat,
+          lng,
+        );
+
+    if (distance > _geofenceRadiusMeters) {
+      return '$coords — ${distance.toStringAsFixed(0)} m do ponto da OS';
+    }
+    return coords;
+  }
+
+  void _handleStatus(BuildContext context, InspectionFormState state) {
+    switch (state.status) {
+      case InspectionFormStatus.draftSaved:
+        _showMessage(context, 'Rascunho salvo.');
+      case InspectionFormStatus.completed:
+        // Pop antes da mensagem: assim quem a exibe é o ScaffoldMessenger da
+        // tela de baixo, e ela não some junto com esta.
+        Navigator.of(context).pop();
+        _showMessage(context, 'Inspeção concluída e na fila de envio.');
+      case InspectionFormStatus.invalid:
+        _showMessage(context, 'Inspeção incompleta. Revise os campos.');
+      case InspectionFormStatus.captureFailed:
+        final failure = state.captureFailure;
+        final canOpenSettings =
+            failure is LocationFailure && failure.canOpenSettings;
+
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(failure?.message ?? 'Falha na captura.'),
+              action: canOpenSettings
+                  ? SnackBarAction(
+                      label: 'Configurações',
+                      onPressed: context.read<LocationService>().openSettings,
+                    )
+                  : null,
+            ),
+          );
+      case _:
+        break;
+    }
   }
 
   @override
@@ -90,24 +176,14 @@ class _InspectionFormViewState extends State<_InspectionFormView> {
             setState(() => _condition = state.draft?.condition);
           }
 
-          switch (state.status) {
-            case InspectionFormStatus.draftSaved:
-              _showMessage(context, 'Rascunho salvo.');
-            case InspectionFormStatus.completed:
-              // Pop antes da mensagem: assim quem a exibe é o ScaffoldMessenger
-              // da tela de baixo, e ela não some junto com esta.
-              Navigator.of(context).pop();
-              _showMessage(context, 'Inspeção concluída e na fila de envio.');
-            case InspectionFormStatus.invalid:
-              _showMessage(context, 'Inspeção incompleta. Revise os campos.');
-            case _:
-              break;
-          }
+          _handleStatus(context, state);
         },
         builder: (context, state) {
           if (state.status == InspectionFormStatus.loading) {
             return const Center(child: CircularProgressIndicator());
           }
+
+          final photoPath = state.draft?.photoPath;
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -145,18 +221,29 @@ class _InspectionFormViewState extends State<_InspectionFormView> {
               _CaptureTile(
                 icon: Icons.photo_camera_outlined,
                 label: 'Foto da evidência',
-                value: state.draft?.photoPath,
-                emptyLabel: 'Nenhuma foto capturada',
+                emptyLabel: 'Toque para capturar',
+                value: photoPath == null ? null : 'Foto capturada',
                 error: _firstError(state, 'photo'),
+                onTap: state.isBusy ? null : () => _capturePhoto(context),
+                leadingPreview: photoPath == null
+                    ? null
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.file(
+                          File(context.read<PhotoService>().resolve(photoPath)),
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
               ),
               _CaptureTile(
                 icon: Icons.my_location_outlined,
                 label: 'Localização',
-                value: state.draft?.latitude == null
-                    ? null
-                    : '${state.draft!.latitude}, ${state.draft!.longitude}',
-                emptyLabel: 'Nenhuma localização capturada',
+                emptyLabel: 'Toque para capturar',
+                value: _locationLabel(context, state),
                 error: _firstError(state, 'location'),
+                onTap: state.isBusy ? null : () => _captureLocation(context),
               ),
               const SizedBox(height: 32),
               OutlinedButton(
@@ -205,21 +292,24 @@ class _WorkOrderHeader extends StatelessWidget {
   }
 }
 
-/// Foto e localização ganham captura no próximo passo.
 class _CaptureTile extends StatelessWidget {
   const _CaptureTile({
     required this.icon,
     required this.label,
     required this.emptyLabel,
+    required this.onTap,
     this.value,
     this.error,
+    this.leadingPreview,
   });
 
   final IconData icon;
   final String label;
   final String emptyLabel;
+  final VoidCallback? onTap;
   final String? value;
   final String? error;
+  final Widget? leadingPreview;
 
   @override
   Widget build(BuildContext context) {
@@ -228,14 +318,15 @@ class _CaptureTile extends StatelessWidget {
 
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: hasError ? theme.colorScheme.error : null),
+      onTap: onTap,
+      leading: leadingPreview ??
+          Icon(icon, color: hasError ? theme.colorScheme.error : null),
       title: Text(label),
       subtitle: Text(
         error ?? value ?? emptyLabel,
         style: hasError ? TextStyle(color: theme.colorScheme.error) : null,
       ),
       trailing: const Icon(Icons.chevron_right),
-      enabled: false,
     );
   }
 }

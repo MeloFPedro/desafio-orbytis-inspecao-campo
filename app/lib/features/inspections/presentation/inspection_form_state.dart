@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/error/failures.dart';
 
 enum InspectionFormStatus {
   loading,
@@ -9,6 +10,7 @@ enum InspectionFormStatus {
   draftSaved,
   completed,
   invalid,
+  captureFailed,
 }
 
 /// Estado único com campo de status, e não estados separados.
@@ -22,6 +24,7 @@ class InspectionFormState extends Equatable {
     this.clientId,
     this.draft,
     this.errors = const {},
+    this.captureFailure,
   });
 
   final InspectionFormStatus status;
@@ -35,6 +38,9 @@ class InspectionFormState extends Equatable {
   /// Mesmo formato que a API devolve em um 400: campo -> mensagens.
   final Map<String, List<String>> errors;
 
+  /// Falha de câmera ou GPS. Separada de [errors], que é validação de conteúdo.
+  final Failure? captureFailure;
+
   bool get isBusy =>
       status == InspectionFormStatus.loading ||
       status == InspectionFormStatus.saving;
@@ -44,15 +50,17 @@ class InspectionFormState extends Equatable {
     String? clientId,
     Inspection? draft,
     Map<String, List<String>>? errors,
+    Failure? captureFailure,
   }) {
     return InspectionFormState(
       status: status ?? this.status,
       clientId: clientId ?? this.clientId,
       draft: draft ?? this.draft,
       errors: errors ?? this.errors,
+      captureFailure: captureFailure ?? this.captureFailure,
     );
   }
 
   @override
-  List<Object?> get props => [status, clientId, draft, errors];
+  List<Object?> get props => [status, clientId, draft, errors, captureFailure];
 }

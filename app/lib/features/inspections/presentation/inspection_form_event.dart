@@ -12,8 +12,12 @@ class InspectionFormOpened extends InspectionFormEvent {
   const InspectionFormOpened();
 }
 
-class InspectionDraftSaved extends InspectionFormEvent {
-  const InspectionDraftSaved({required this.observation, this.condition});
+/// Ações que carregam o conteúdo atual da tela.
+///
+/// Qualquer uma delas grava no banco, então precisa levar junto o que o
+/// técnico digitou — caso contrário a escrita apagaria o texto não salvo.
+sealed class InspectionFormAction extends InspectionFormEvent {
+  const InspectionFormAction({required this.observation, this.condition});
 
   final String observation;
   final String? condition;
@@ -22,15 +26,24 @@ class InspectionDraftSaved extends InspectionFormEvent {
   List<Object?> get props => [observation, condition];
 }
 
-class InspectionCompleteRequested extends InspectionFormEvent {
+class InspectionDraftSaved extends InspectionFormAction {
+  const InspectionDraftSaved({required super.observation, super.condition});
+}
+
+class InspectionCompleteRequested extends InspectionFormAction {
   const InspectionCompleteRequested({
-    required this.observation,
-    this.condition,
+    required super.observation,
+    super.condition,
   });
+}
 
-  final String observation;
-  final String? condition;
+class InspectionPhotoRequested extends InspectionFormAction {
+  const InspectionPhotoRequested({required super.observation, super.condition});
+}
 
-  @override
-  List<Object?> get props => [observation, condition];
+class InspectionLocationRequested extends InspectionFormAction {
+  const InspectionLocationRequested({
+    required super.observation,
+    super.condition,
+  });
 }
