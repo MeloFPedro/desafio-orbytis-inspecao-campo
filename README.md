@@ -182,6 +182,17 @@ O acesso passa por um DAO que concentra as consultas, e por um repositório que 
 transições de negócio — salvar rascunho e concluir. As leituras da tela de histórico são
 `Stream`: quando a fila altera o status de um registro, a lista se atualiza sozinha.
 
+### Captura de evidências
+
+Dois serviços em `core/`, injetados na árvore e consumidos pelo bloc do formulário:
+
+`PhotoService` abre a câmera, redimensiona na captura (1280 px, qualidade 85) e persiste
+a imagem. `LocationService` resolve a posição e calcula distâncias.
+
+Ambas as capturas **gravam no banco imediatamente**, em vez de aguardarem "Salvar
+rascunho". Se ficassem em memória, um encerramento do app pelo sistema deixaria o arquivo
+no disco e a inspeção sem referência a ele.
+
 ## Fila de sincronização
 
 _Em construção._
@@ -354,6 +365,42 @@ que não está no horizonte deste projeto.
 O acoplamento é real e assumido. Num sistema com mais de uma fonte de dados para a mesma
 entidade, a decisão se inverteria.
 
+### A foto é copiada do cache antes de ser referenciada
+
+O `image_picker` grava no diretório de cache do sistema, que o Android limpa quando
+precisa de espaço. Guardar aquele caminho faria a inspeção sobreviver ao fechamento do
+app, mas não a foto — e a falha apareceria dias depois, na sincronização, longe da causa.
+
+A imagem é copiada para o diretório de documentos e o banco guarda um caminho **relativo**
+(`inspections/<uuid>.jpg`). Absoluto quebraria entre reinstalações, quando o container do
+app muda de lugar.
+
+Ao substituir uma foto, a anterior só é apagada **depois** que a nova está gravada no
+banco. Na ordem inversa, uma falha de escrita deixaria a inspeção sem foto alguma.
+
+### Os quatro modos de falha do GPS
+
+`LocationService` distingue serviço desligado, permissão negada, permissão negada
+permanentemente e ausência de sinal dentro do tempo limite. Cada um exige uma ação
+diferente do usuário, e só o terceiro é um beco sem saída: a partir da segunda recusa o
+Android para de exibir o diálogo e responde "negado" sem nenhum sinal visível.
+
+Por isso `LocationFailure` carrega `canOpenSettings`, e a mensagem correspondente oferece
+um atalho para as configurações do app. Sem essa distinção, o técnico tocaria no botão
+indefinidamente sem entender por que nada acontece.
+
+O `timeLimit` de 20 segundos cobre o quarto caso — técnico dentro de uma subestação, sem
+céu visível. Sem ele, a espera seria indefinida e indistinguível de um travamento.
+
+### Geofence avisa, não bloqueia
+
+Quando a posição capturada está a mais de 200 m do ponto da ordem de serviço, o campo de
+localização exibe a distância. A conclusão continua permitida.
+
+GPS impreciso é comum em campo, e travar o registro de quem está no local seria pior do
+que aceitar uma coordenada duvidosa com aviso visível. O cálculo fica na camada de
+apresentação por ser puramente informativo, derivado de dados que a tela já possui.
+
 ### Estado único com status no formulário, estados separados na autenticação
 
 Os dois blocs usam padrões diferentes de propósito. O critério: **estados separados quando
@@ -386,6 +433,9 @@ cada transição.
 - **O mock não vincula ordens de serviço a técnicos.** `GET /work-orders` devolve a lista
   completa para qualquer token válido, enquanto `GET /inspections` filtra por `createdBy`.
   A assimetria é da API mock; o app exibe o que recebe.
+- **Fotos perdidas por encerramento do sistema não são recuperadas.** Se o Android matar o
+  app enquanto a câmera está em primeiro plano, o resultado da captura se perde. O
+  `image_picker` oferece `retrieveLostData()` para esse caso; não foi implementado.
 - **Papéis não são usados.** O contrato prevê `field_technician` e `admin`, e o `role` é
   persistido no dispositivo, mas nenhuma tela distingue os dois. Uma visão de supervisão
   exigiria endpoint e permissão que o mock não expõe.
