@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:drift/drift.dart';
+import 'package:equatable/equatable.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/error/failures.dart';
@@ -10,7 +11,7 @@ import '../../inspections/data/inspections_api.dart';
 import '../../inspections/data/inspections_dao.dart';
 
 /// Resultado de uma passada da fila.
-class SyncResult {
+class SyncResult extends Equatable {
   const SyncResult({
     this.synced = 0,
     this.failed = 0,
@@ -30,6 +31,10 @@ class SyncResult {
   final bool sessionExpired;
 
   int get processed => synced + failed + retryScheduled;
+
+  @override
+  List<Object?> get props =>
+      [synced, failed, retryScheduled, skipped, sessionExpired];
 }
 
 /// Percorre a fila de inspeções `pending` e as envia à API.

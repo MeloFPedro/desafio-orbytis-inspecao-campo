@@ -1,3 +1,4 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -9,6 +10,8 @@ import 'features/auth/presentation/auth_event.dart';
 import 'features/auth/presentation/auth_state.dart';
 import 'features/auth/presentation/login_page.dart';
 import 'features/inspections/data/inspections_repository.dart';
+import 'features/sync/data/sync_service.dart';
+import 'features/sync/presentation/sync_bloc.dart';
 import 'features/work_orders/data/work_orders_repository.dart';
 import 'features/work_orders/presentation/work_orders_bloc.dart';
 import 'features/work_orders/presentation/work_orders_event.dart';
@@ -21,6 +24,8 @@ class InspecaoCampoApp extends StatelessWidget {
     required this.inspectionsRepository,
     required this.photoService,
     required this.locationService,
+    required this.syncService,
+    required this.connectivity,
     required this.sessionExpired,
     super.key,
   });
@@ -30,6 +35,8 @@ class InspecaoCampoApp extends StatelessWidget {
   final InspectionsRepository inspectionsRepository;
   final PhotoService photoService;
   final LocationService locationService;
+  final SyncService syncService;
+  final Stream<List<ConnectivityResult>> connectivity;
   final Stream<void> sessionExpired;
 
   @override
@@ -44,9 +51,20 @@ class InspecaoCampoApp extends StatelessWidget {
         RepositoryProvider.value(value: photoService),
         RepositoryProvider.value(value: locationService),
       ],
-      child: BlocProvider(
-        create: (_) => AuthBloc(authRepository, sessionExpired: sessionExpired)
-          ..add(const AuthStatusChecked()),
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider(
+            create: (_) =>
+                AuthBloc(authRepository, sessionExpired: sessionExpired)
+                  ..add(const AuthStatusChecked()),
+          ),
+          // Na raiz, e não no ramo autenticado: o ouvinte de conectividade
+          // precisa continuar vivo enquanto o app estiver aberto, senão a
+          // fila deixaria de reagir ao retorno da rede.
+          BlocProvider(
+            create: (_) => SyncBloc(syncService, connectivity: connectivity),
+          ),
+        ],
         child: MaterialApp(
           title: 'Inspeção de Campo',
           debugShowCheckedModeBanner: false,

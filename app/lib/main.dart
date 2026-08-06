@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
@@ -12,8 +13,10 @@ import 'core/network/auth_interceptor.dart';
 import 'core/network/dio_client.dart';
 import 'features/auth/data/auth_api.dart';
 import 'features/auth/data/auth_repository.dart';
+import 'features/inspections/data/inspections_api.dart';
 import 'features/inspections/data/inspections_dao.dart';
 import 'features/inspections/data/inspections_repository.dart';
+import 'features/sync/data/sync_service.dart';
 import 'features/work_orders/data/work_orders_api.dart';
 import 'features/work_orders/data/work_orders_repository.dart';
 
@@ -31,14 +34,23 @@ Future<void> main() async {
   final dio = createDioClient();
   final database = AppDatabase();
 
+  final photoService = PhotoService(documentsDir.path);
+  const locationService = LocationService();
+
   final authRepository = AuthRepository(
     AuthApi(dio),
     const FlutterSecureStorage(),
   );
   final workOrdersRepository = WorkOrdersRepository(WorkOrdersApi(dio));
-  final inspectionsRepository = InspectionsRepository(InspectionsDao(database));
-  final photoService = PhotoService(documentsDir.path);
-  const locationService = LocationService();
+
+  final inspectionsDao = InspectionsDao(database);
+  final inspectionsRepository = InspectionsRepository(inspectionsDao);
+
+  final syncService = SyncService(
+    InspectionsApi(dio),
+    inspectionsDao,
+    photoService,
+  );
 
   // Registrado depois do repositório: é o que quebra a dependência circular.
   dio.interceptors.add(
@@ -55,6 +67,8 @@ Future<void> main() async {
       inspectionsRepository: inspectionsRepository,
       photoService: photoService,
       locationService: locationService,
+      syncService: syncService,
+      connectivity: Connectivity().onConnectivityChanged,
       sessionExpired: sessionExpired.stream,
     ),
   );
