@@ -48,6 +48,13 @@ flutter pub get
 flutter run
 ```
 
+O código gerado pelo Drift está versionado, então não é necessário rodar o gerador para
+executar o projeto. Ao alterar o esquema do banco:
+
+```bash
+dart run build_runner build
+```
+
 ### Base URL por ambiente
 
 A URL da API fica em `app/lib/core/network/dio_client.dart`, na constante
@@ -154,6 +161,27 @@ O stream também resolve uma dependência circular: `AuthBloc → AuthRepository
 Dio → AuthInterceptor`. O interceptor não conhece o bloc; apenas anuncia, e quem quiser
 escuta.
 
+### Persistência local
+
+Uma única tabela, `inspections`, cujo esquema foi desenhado em torno do ciclo de vida da
+sincronização:
+
+| Grupo | Colunas | Papel |
+|---|---|---|
+| Identidade | `clientId` (PK), `serverId` | UUID local e id atribuído pelo servidor |
+| Conteúdo | `observation`, `condition`, `photoPath`, `latitude`, `longitude`, `capturedAt` | o que o técnico registrou |
+| Fila | `syncStatus`, `lastError`, `retryCount`, `nextAttemptAt` | estado do envio |
+| Auditoria | `workOrderId`, `createdAt`, `updatedAt` | vínculo e histórico |
+
+O `clientId` é gerado no dispositivo e é a chave de idempotência do contrato: reenvios
+usam o mesmo valor, e o servidor devolve `200` com o registro existente em vez de
+duplicar. Usá-lo como chave primária alinha o modelo local ao contrato remoto, em vez de
+mantê-lo como coluna secundária ao lado de um inteiro autoincremento.
+
+O acesso passa por um DAO que concentra as consultas, e por um repositório que expõe as
+transições de negócio — salvar rascunho e concluir. As leituras da tela de histórico são
+`Stream`: quando a fila altera o status de um registro, a lista se atualiza sozinha.
+
 ## Fila de sincronização
 
 _Em construção._
@@ -171,6 +199,18 @@ evento → estado torna a lógica testável sem construir widgets.
 
 **Dio** para rede, pelos interceptors — o token é injetado num único lugar em vez de ser
 repetido em cada chamada.
+
+**Drift** como banco local, por três razões concretas:
+
+- SQL verificado em tempo de compilação — erro de coluna vira erro de build, e não
+  exceção no aparelho do técnico;
+- consultas reativas (`Stream`), que fazem a tela de histórico refletir mudanças da fila
+  sem código de sincronização manual entre camadas;
+- migrações versionadas, com caminho documentado para evoluir o esquema.
+
+A segunda razão é a decisiva neste projeto: sem ela, cada alteração de status feita pela
+fila exigiria notificar a UI explicitamente — exatamente o tipo de acoplamento onde
+estados divergem.
 
 **Freezed adiado.** O escopo desejável cita "modelos imutáveis (Freezed) e/ou codegen
 coerente". Optei por priorizar o escopo obrigatório e não empilhar duas ferramentas de
@@ -263,6 +303,68 @@ tela de erro.
 Pelo mesmo motivo, coordenadas são lidas como `num` antes de virar `double`: JSON não
 distingue `-7` de `-7.0`, e `as double` falharia sobre um inteiro.
 
+### Rascunho incompleto é um estado válido do banco
+
+`photoPath`, `latitude`, `longitude` e `capturedAt` são anuláveis. Um rascunho é
+legitimamente incompleto: o técnico escreve a observação, sai do app e volta depois para
+capturar a foto. Se o esquema exigisse esses campos, salvar rascunho seria impossível.
+
+A validação acontece na transição para `pending`, não no esquema — a distinção entre o
+que o banco aceita guardar e o que a regra de negócio considera pronto para enviar.
+
+### Validação local antes de enfileirar
+
+As regras verificadas ao concluir são as mesmas do servidor: observação com no mínimo dez
+caracteres, foto e coordenadas obrigatórias.
+
+Deixar o servidor recusar também funcionaria, mas a inspeção entraria na fila, seria
+enviada, voltaria `400` e terminaria em `failed` — gastando rede por um erro previsível
+antes de sair do dispositivo. Pior: o técnico só descobriria ao recuperar sinal,
+possivelmente longe do ativo. Validando antes, o erro aparece com o poste ainda à frente.
+
+O `ValidationFailure` local usa o mesmo formato `campo → mensagens` que a API devolve num
+`400`, então a tela renderiza os dois sem saber de onde o erro veio.
+
+### Estado do backoff persistido na linha
+
+`retryCount` e `nextAttemptAt` são colunas, não variáveis do serviço de sincronização. Em
+memória, fechar o app zeraria o contador e o aparelho voltaria martelando a API. Na
+tabela, a fila retoma de onde parou — comportamento necessário num app sujeito a ser
+encerrado pelo sistema a qualquer momento.
+
+### Status gravado como texto
+
+`syncStatus` usa `textEnum`, gravando `"pending"` em vez de um inteiro. Custa alguns bytes
+e paga na inspeção do banco durante o desenvolvimento, onde o estado da fila é lido
+dezenas de vezes.
+
+### Foto no sistema de arquivos, caminho relativo no banco
+
+Blob de imagem incha o banco e degrada todas as consultas. O caminho é **relativo** ao
+diretório de documentos do app porque o container muda entre reinstalações no Android —
+um caminho absoluto salvo hoje pode apontar para lugar nenhum depois.
+
+### Classe do Drift usada como modelo de domínio
+
+A `Inspection` gerada é imutável, tem `copyWith` e igualdade por valor. Um modelo de
+domínio paralelo, com mapeamento nos dois sentidos, isolaria a apresentação da
+persistência — mas custaria cerca de 80 linhas para proteger contra uma troca de banco
+que não está no horizonte deste projeto.
+
+O acoplamento é real e assumido. Num sistema com mais de uma fonte de dados para a mesma
+entidade, a decisão se inverteria.
+
+### Estado único com status no formulário, estados separados na autenticação
+
+Os dois blocs usam padrões diferentes de propósito. O critério: **estados separados quando
+os dados são disjuntos, estado único com campo de status quando os mesmos dados persistem
+através das transições.**
+
+Em `AuthState`, `AuthAuthenticated` carrega usuário e `AuthLoading` não carrega nada —
+separar torna combinações impossíveis inexprimíveis. No formulário, `clientId` e rascunho
+existem em todos os momentos, e estados separados obrigariam a copiar os mesmos dados a
+cada transição.
+
 ---
 
 ## Limitações conhecidas
@@ -275,3 +377,15 @@ distingue `-7` de `-7.0`, e `as double` falharia sobre um inteiro.
 - **O token não é renovado.** A API mock não expõe refresh token, então a expiração leva
   ao login. Em produção, um interceptor tentaria renovar antes de derrubar a sessão.
 - **Sem testes automatizados até o momento.**
+- **Um técnico por dispositivo.** O banco local não é segmentado por usuário: trocar de
+  conta no mesmo aparelho expõe os rascunhos da sessão anterior, e uma inspeção
+  sincronizada por outro usuário seria atribuída a ele, já que o servidor grava
+  `createdBy` a partir do token de quem envia. A correção seria uma coluna de proprietário
+  filtrando as consultas — deliberadamente **não** limpando o banco no logout, o que
+  destruiria inspeções ainda não sincronizadas.
+- **O mock não vincula ordens de serviço a técnicos.** `GET /work-orders` devolve a lista
+  completa para qualquer token válido, enquanto `GET /inspections` filtra por `createdBy`.
+  A assimetria é da API mock; o app exibe o que recebe.
+- **Papéis não são usados.** O contrato prevê `field_technician` e `admin`, e o `role` é
+  persistido no dispositivo, mas nenhuma tela distingue os dois. Uma visão de supervisão
+  exigiria endpoint e permissão que o mock não expõe.
