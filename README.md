@@ -55,6 +55,19 @@ executar o projeto. Ao alterar o esquema do banco:
 dart run build_runner build
 ```
 
+### 3. Testes
+
+```bash
+cd app
+flutter test
+```
+
+Oito testes cobrem o serviço de sincronização: sucesso com `serverId`, erro permanente
+versus transiente, `401` interrompendo a fila sem marcar nada, teto de tentativas, reuso
+do `clientId` no reenvio e o mutex contra execução dupla.
+
+Os dublês são escritos à mão — sem biblioteca de mocking nem geração de código.
+
 ### Base URL por ambiente
 
 A URL da API fica em `app/lib/core/network/dio_client.dart`, na constante
