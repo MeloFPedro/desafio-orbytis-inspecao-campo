@@ -167,26 +167,28 @@ class _WorkOrderCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(order.address),
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              // Com três selos, telas estreitas quebram linha.
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            // Empilhados: com os rótulos, os selos ficam largos demais para
+            // caber lado a lado sem quebra irregular.
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Chip(
-                  label: Text(order.priority.label),
+                  label: Text('Prioridade: ${order.priority.label}'),
                   labelStyle: TextStyle(color: _priorityColor(context)),
                   visualDensity: VisualDensity.compact,
                 ),
+                const SizedBox(height: 6),
                 Chip(
-                  label: Text(order.status.label),
+                  label: Text('Status: ${order.status.label}'),
                   visualDensity: VisualDensity.compact,
                 ),
-                if (inspectionStatus != null)
+                if (inspectionStatus != null) ...[
+                  const SizedBox(height: 6),
                   InspectionStatusChip(
                     status: inspectionStatus!,
                     prefix: 'Inspeção',
                   ),
+                ],
               ],
             ),
           ],
