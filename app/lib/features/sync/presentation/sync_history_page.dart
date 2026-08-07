@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -144,25 +145,40 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          FilterChip(
-            label: const Text('Todas'),
-            selected: selected == null,
-            onSelected: (_) => onChanged(null),
-          ),
-          for (final status in SyncStatus.values) ...[
-            const SizedBox(width: 8),
+    return ScrollConfiguration(
+      // Por padrão o Flutter só permite arrastar com toque e stylus. No
+      // emulador e no desktop, o ponteiro é tratado como mouse — e a barra
+      // fica visualmente rolável mas inerte ao arrasto.
+      behavior: ScrollConfiguration.of(context).copyWith(
+        dragDevices: {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+          PointerDeviceKind.stylus,
+        },
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        // Garante o gesto mesmo quando o conteúdo couber na tela.
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
             FilterChip(
-              label: Text(status.label),
-              selected: selected == status,
-              onSelected: (_) => onChanged(status),
+              label: const Text('Todas'),
+              selected: selected == null,
+              onSelected: (_) => onChanged(null),
             ),
+            for (final status in SyncStatus.values) ...[
+              const SizedBox(width: 8),
+              FilterChip(
+                label: Text(status.label),
+                selected: selected == status,
+                onSelected: (_) => onChanged(status),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
