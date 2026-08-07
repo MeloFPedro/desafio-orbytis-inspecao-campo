@@ -12,6 +12,7 @@ import 'features/auth/presentation/login_page.dart';
 import 'features/inspections/data/inspections_repository.dart';
 import 'features/sync/data/sync_service.dart';
 import 'features/sync/presentation/sync_bloc.dart';
+import 'features/sync/presentation/sync_event.dart';
 import 'features/work_orders/data/work_orders_repository.dart';
 import 'features/work_orders/presentation/work_orders_bloc.dart';
 import 'features/work_orders/presentation/work_orders_event.dart';
@@ -69,13 +70,24 @@ class InspecaoCampoApp extends StatelessWidget {
           ),
         ],
         child: BlocListener<AuthBloc, AuthState>(
-          // Ao cair a sessão, desempilha tudo. Sem isto, o _AuthGate troca o
-          // conteúdo da rota raiz mas as telas abertas por Navigator.push
-          // permanecem por cima — o técnico veria o histórico sobre um login.
-          listenWhen: (previous, current) =>
-              previous is AuthAuthenticated && current is AuthUnauthenticated,
-          listener: (_, _) =>
-              _navigatorKey.currentState?.popUntil((route) => route.isFirst),
+          listener: (context, state) {
+            switch (state) {
+              // Ao cair a sessão, desempilha tudo. Sem isto, o _AuthGate troca
+              // o conteúdo da rota raiz mas as telas abertas por
+              // Navigator.push permanecem por cima — o técnico veria o
+              // histórico sobre um login.
+              case AuthUnauthenticated():
+                _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+
+              // Entrar é sinal novo, do mesmo tipo que a rede voltando: as
+              // inspeções que esperavam por token sobem sozinhas.
+              case AuthAuthenticated():
+                context.read<SyncBloc>().add(const SyncSessionStarted());
+
+              case _:
+                break;
+            }
+          },
           child: MaterialApp(
             navigatorKey: _navigatorKey,
             title: 'Inspeção de Campo',

@@ -26,3 +26,12 @@ class SyncAutoTriggered extends SyncEvent {
 class SyncConnectivityRestored extends SyncEvent {
   const SyncConnectivityRestored();
 }
+
+/// Usuário autenticou. Silencioso e ignora o backoff.
+///
+/// Cobre o caso de sessão expirada: as inspeções que ficaram em espera por
+/// falta de token sobem assim que o técnico entra de novo, sem que ele
+/// precise procurar o botão de sincronizar.
+class SyncSessionStarted extends SyncEvent {
+  const SyncSessionStarted();
+}
