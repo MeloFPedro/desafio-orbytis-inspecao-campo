@@ -91,7 +91,7 @@ npm start
 
 ## Arquitetura
 
-### Organização por feature
+### Organização
 
 ```
 app/lib/
@@ -100,7 +100,9 @@ app/lib/
 ├── core/                  # transversal às features
 │   ├── error/             # tipos de falha e tradução de erros HTTP
 │   ├── network/           # cliente Dio e interceptor de autenticação
-│   └── database/          # persistência local
+│   ├── database/          # esquema e acesso ao banco local
+│   ├── media/             # captura e armazenamento de fotos
+│   └── location/          # GPS e cálculo de distância
 └── features/
     ├── auth/
     ├── work_orders/
@@ -108,20 +110,14 @@ app/lib/
     └── sync/
 ```
 
-A organização é **por feature**, não por camada. Tudo que muda junto fica junto: alterar
-o fluxo de inspeção significa abrir uma pasta, não quatro. O agrupamento por tipo
-(`blocs/`, `models/`, `screens/`) funciona em app pequeno e degrada conforme cresce.
-
-### Camadas dentro de cada feature
+Por **feature**, não por camada: tudo que muda junto fica junto. Dentro de cada uma, três
+camadas com dependência apontando para dentro:
 
 | Camada | Responsabilidade | Conhece |
 |---|---|---|
 | `domain/` | modelos e regras de negócio | nada |
 | `data/` | acesso a API e persistência | `domain` |
 | `presentation/` | blocs e telas | `data`, `domain` |
-
-A dependência aponta sempre para dentro. O `domain` não importa Dio nem Flutter, o que
-o torna testável sem infraestrutura.
 
 ### Fluxo de dados
 
@@ -131,21 +127,20 @@ UI ──evento──► Bloc ──► Repository ──► Api ──► Dio �
 └─────estado─────┘
 ```
 
-A UI nunca chama repositório: ela dispara eventos e reconstrói a partir do estado.
-Consequência prática: toda a lógica é testável sem construir widgets.
+A UI nunca chama repositório: dispara eventos e reconstrói a partir do estado. Toda a
+lógica é testável sem construir widgets.
 
-A camada `Api` conhece apenas HTTP — rotas, status, JSON — e devolve dados crus. Traduzir
-para objetos de domínio é trabalho do repositório. Isso permite trocar a biblioteca de
-rede sem tocar em nada acima.
+A camada `Api` conhece apenas HTTP — rotas, status, JSON — e devolve dados crus; traduzir
+para objetos de domínio é trabalho do repositório.
 
 ### Injeção de dependência
 
-Sem biblioteca de service locator. O `main.dart` constrói os repositórios uma única vez e
-o `flutter_bloc` os distribui pela árvore via `RepositoryProvider`; os blocs vêm de
-`BlocProvider`, que cuida do ciclo de vida e chama `close()` automaticamente.
+Sem service locator. O `main.dart` constrói os repositórios uma única vez e o
+`flutter_bloc` os distribui pela árvore via `RepositoryProvider`; os blocs vêm de
+`BlocProvider`, que cuida do ciclo de vida.
 
-Os blocs de feature são criados **dentro** do ramo autenticado da árvore. Assim nascem no
-login e são descartados no logout, sem que dados de uma sessão sobrevivam à seguinte.
+Os blocs de feature nascem **dentro** do ramo autenticado da árvore, e são descartados no
+logout — sem que dados de uma sessão sobrevivam à seguinte.
 
 ### Autenticação
 
@@ -154,263 +149,215 @@ login e são descartados no logout, sem que dados de uma sessão sobrevivam à s
 
 Um `401` não é erro da tela que fez a chamada — é a sessão que expirou. O tratamento é
 centralizado: o interceptor anuncia num `StreamController`, o `AuthBloc` escuta e derruba
-a sessão, e o app inteiro volta ao login. Sem isso, cada bloc precisaria tratar o caso por
-conta própria, com mensagens divergentes para a mesma causa.
+a sessão. O stream também resolve a dependência circular `AuthBloc → AuthRepository →
+AuthApi → Dio → AuthInterceptor`: o interceptor não conhece o bloc, apenas anuncia.
 
-O stream também resolve uma dependência circular: `AuthBloc → AuthRepository → AuthApi →
-Dio → AuthInterceptor`. O interceptor não conhece o bloc; apenas anuncia, e quem quiser
-escuta.
+A sessão é restaurada lendo token e usuário do armazenamento seguro, sem consultar
+`GET /auth/me`. Num app de campo, exigir rede para reentrar deixaria o técnico de fora
+justamente onde ele mais precisa.
 
 ### Persistência local
 
-Uma única tabela, `inspections`, cujo esquema foi desenhado em torno do ciclo de vida da
-sincronização:
+Uma tabela, `inspections`, desenhada em torno do ciclo de vida da sincronização:
 
-| Grupo | Colunas | Papel |
-|---|---|---|
-| Identidade | `clientId` (PK), `serverId` | UUID local e id atribuído pelo servidor |
-| Conteúdo | `observation`, `condition`, `photoPath`, `latitude`, `longitude`, `capturedAt` | o que o técnico registrou |
-| Fila | `syncStatus`, `lastError`, `retryCount`, `nextAttemptAt` | estado do envio |
-| Auditoria | `workOrderId`, `createdAt`, `updatedAt` | vínculo e histórico |
+| Grupo | Colunas |
+|---|---|
+| Identidade | `clientId` (PK), `serverId` |
+| Conteúdo | `observation`, `condition`, `photoPath`, `latitude`, `longitude`, `capturedAt` |
+| Fila | `syncStatus`, `lastError`, `retryCount`, `nextAttemptAt` |
+| Auditoria | `workOrderId`, `createdAt`, `updatedAt` |
 
-O `clientId` é gerado no dispositivo e é a chave de idempotência do contrato: reenvios
-usam o mesmo valor, e o servidor devolve `200` com o registro existente em vez de
-duplicar. Usá-lo como chave primária alinha o modelo local ao contrato remoto, em vez de
-mantê-lo como coluna secundária ao lado de um inteiro autoincremento.
+O `clientId` é gerado no dispositivo e é a chave de idempotência do contrato. Usá-lo como
+chave primária alinha o modelo local ao contrato remoto.
 
-O acesso passa por um DAO que concentra as consultas, e por um repositório que expõe as
-transições de negócio — salvar rascunho e concluir. As leituras da tela de histórico são
-`Stream`: quando a fila altera o status de um registro, a lista se atualiza sozinha.
+Os campos de conteúdo são **anuláveis** de propósito: um rascunho é legitimamente
+incompleto — o técnico escreve a observação, sai do app e volta depois para a foto. A
+validação para enviar acontece na transição para `pending`, não no esquema.
+
+O acesso passa por um DAO que concentra as consultas e um repositório que expõe as
+transições de negócio. As leituras da tela de histórico são `Stream`: quando a fila altera
+o status de um registro, a lista se atualiza sozinha.
 
 ### Captura de evidências
 
-Dois serviços em `core/`, injetados na árvore e consumidos pelo bloc do formulário:
+`PhotoService` abre a câmera, reduz a imagem para 1280 px e **copia do cache do sistema
+para o diretório de documentos** — o Android limpa o cache quando precisa de espaço, e
+guardar aquele caminho faria a inspeção sobreviver ao fechamento do app mas não a foto. O
+banco guarda caminho relativo, porque o container muda entre reinstalações.
 
-`PhotoService` abre a câmera, redimensiona na captura (1280 px, qualidade 85) e persiste
-a imagem. `LocationService` resolve a posição e calcula distâncias.
+`LocationService` distingue os quatro modos de falha do GPS: serviço desligado, permissão
+negada, permissão negada permanentemente e ausência de sinal. Só o terceiro é um beco sem
+saída — a partir da segunda recusa o Android para de exibir o diálogo e responde "negado"
+sem sinal visível —, então `LocationFailure` carrega `canOpenSettings` e a mensagem
+oferece atalho para as configurações.
 
-Ambas as capturas **gravam no banco imediatamente**, em vez de aguardarem "Salvar
-rascunho". Se ficassem em memória, um encerramento do app pelo sistema deixaria o arquivo
-no disco e a inspeção sem referência a ele.
+Ambas as capturas gravam no banco imediatamente, em vez de aguardarem "Salvar rascunho".
+
+Quando a posição está a mais de 200 m do ponto da OS, o campo exibe a distância — **aviso,
+não bloqueio**. GPS impreciso é comum em campo, e travar o registro de quem está no local
+seria pior do que aceitar uma coordenada duvidosa com aviso visível.
+
+---
 
 ## Fila de sincronização
 
-_Em construção._
+### Estados
+
+```
+        Salvar rascunho          Concluir
+   ─────────────────────►  draft ─────────►  pending
+                                                │
+                        ┌───────────────────────┤
+                        │                       │
+              erro transiente               200 ou 201
+              (rede, timeout, 5xx)              │
+                        │                       ▼
+                        ▼                    synced
+                pending + backoff
+                        │
+              teto de 5 tentativas
+              ou erro permanente
+              (400, 404, 409)
+                        │
+                        ▼
+                     failed ──── retry manual ────► pending
+```
+
+`draft` nunca vai para a API.
+
+### Classificação de erro
+
+A decisão entre `failed` e nova tentativa vem de `Failure.isPermanent`, e não de uma
+cadeia de condicionais dentro do serviço:
+
+| Situação | Classificação | Destino |
+|---|---|---|
+| Sem rede, timeout, DNS, `5xx` | transiente | `pending` com backoff |
+| `400` payload inválido | permanente | `failed` |
+| `404`, `409` | permanente | `failed` |
+| Foto ausente no dispositivo | permanente | `failed`, sem gastar rede |
+| `401` | — | **nada é marcado**, a fila para |
+
+O `401` é o caso que mais importa acertar. Sessão expirada não diz nada sobre a inspeção:
+marcá-la como `failed` faria o técnico encontrar todos os registros em vermelho por causa
+de um token vencido, e teria que reenviá-los um a um. A passada é interrompida, tudo
+permanece `pending`, e sobe sozinho depois do próximo login.
+
+### Backoff
+
+Falha transiente incrementa `retryCount` e grava `nextAttemptAt` — 30 s, 1 min, 2 min,
+4 min, com teto de uma hora. Na quinta tentativa o registro vai para `failed`.
+
+O estado do adiamento fica **na linha da tabela**, não numa variável do serviço. Em
+memória, fechar o app zeraria o contador e o aparelho voltaria martelando a API.
+
+### Gatilhos
+
+| Gatilho | Backoff | Retorno visual |
+|---|---|---|
+| Botão de sincronizar | ignora | mensagem na tela |
+| Conectividade restaurada | ignora | silencioso |
+| Login | ignora | silencioso |
+| Abertura do histórico | respeita | silencioso |
+| Temporizador (1 min) | respeita | silencioso |
+
+Os três primeiros ignoram o adiamento porque representam **informação nova**: o backoff
+foi calculado sob a premissa de que a rede ou o servidor estavam ruins, e cada um deles
+indica que a premissa mudou. O temporizador não ignora — passar um minuto não é
+informação, e forçar ali truncaria o crescimento exponencial.
+
+O temporizador existe porque, sem ele, `nextAttemptAt` seria respeitado mas nunca
+executado: o adiamento só valeria se outro gatilho aparecesse por acaso depois dele.
+
+Note que **subir o servidor não dispara nada**. Do ponto de vista do dispositivo a
+conectividade não mudou — o `connectivity_plus` reporta interfaces de rede, não
+alcançabilidade do servidor.
+
+### Concorrência
+
+Botão manual, conectividade e temporizador podem coincidir. O serviço tem um mutex: uma
+segunda chamada durante uma passada em curso retorna imediatamente com `skipped`, em vez
+de aguardar — chamadas acumuladas dispararariam em cascata quando a primeira terminasse.
+
+### Idempotência
+
+Cada inspeção nasce com um `clientId` (UUID) gerado no dispositivo. Reenvios usam o mesmo
+valor, e o servidor responde `200` com o registro existente em vez de duplicar.
+
+Por isso o cliente trata **`200` e `201` igualmente como sucesso**. Aceitar apenas `201`
+faria todo reenvio parecer falha: o app retentaria, receberia `200` de novo, e nunca
+sairia do lugar — exatamente o cenário em que a resposta se perde na volta e o registro já
+existe no servidor.
+
+### Envio
+
+`multipart/form-data`, conforme recomendado no contrato. A alternativa JSON com base64
+inflaria a imagem em cerca de 33% contra o limite de 8 MB do servidor.
 
 ---
 
 ## Decisões técnicas
 
-Registro corrido das escolhas não óbvias e suas razões.
-
 ### Stack
 
-**BLoC** para gerência de estado. O enunciado indica que é a stack da Orbytis, e o modelo
+**BLoC** para gerência de estado, alinhado à stack indicada no enunciado. O modelo
 evento → estado torna a lógica testável sem construir widgets.
 
 **Dio** para rede, pelos interceptors — o token é injetado num único lugar em vez de ser
 repetido em cada chamada.
 
-**Drift** como banco local, por três razões concretas:
-
-- SQL verificado em tempo de compilação — erro de coluna vira erro de build, e não
-  exceção no aparelho do técnico;
-- consultas reativas (`Stream`), que fazem a tela de histórico refletir mudanças da fila
-  sem código de sincronização manual entre camadas;
-- migrações versionadas, com caminho documentado para evoluir o esquema.
-
-A segunda razão é a decisiva neste projeto: sem ela, cada alteração de status feita pela
-fila exigiria notificar a UI explicitamente — exatamente o tipo de acoplamento onde
-estados divergem.
+**Drift** como banco local, por três razões: SQL verificado em tempo de compilação;
+consultas reativas (`Stream`); e migrações versionadas. A segunda é a decisiva aqui — sem
+ela, cada alteração de status feita pela fila exigiria notificar a UI explicitamente,
+exatamente o tipo de acoplamento onde estados divergem.
 
 **Freezed adiado.** O escopo desejável cita "modelos imutáveis (Freezed) e/ou codegen
-coerente". Optei por priorizar o escopo obrigatório e não empilhar duas ferramentas de
-geração de código (Freezed + Drift) simultaneamente. Imutabilidade e igualdade por valor
-são obtidas com `Equatable`, sem codegen.
+coerente". Preferi priorizar o escopo obrigatório a empilhar duas ferramentas de geração
+de código simultaneamente. Imutabilidade e igualdade por valor vêm de `Equatable`.
 
 ### Erros: transporte vs. protocolo
 
-O Dio é configurado com `validateStatus: (_) => true`, ou seja, **nenhum status HTTP
-lança exceção**. Isso cria uma separação limpa:
+O Dio é configurado com `validateStatus: (_) => true`, ou seja, **nenhum status HTTP lança
+exceção**:
 
 - `DioException` significa falha de transporte — sem rede, timeout, DNS. Sempre transiente.
 - `response.statusCode` significa que o servidor respondeu, inclusive com erro. O status
   decide se o erro é permanente.
 
 Com o comportamento padrão do Dio, um `401` de senha errada e uma queda de Wi-Fi chegariam
-ambos como `DioException`, e a fila de sincronização precisaria adivinhar a diferença.
+ambos como `DioException`, e a fila precisaria adivinhar a diferença.
 
-### `isPermanent` no tipo `Failure`
+### Onde há BLoC e onde não há
 
-Cada subclasse de `Failure` declara se o erro é permanente (`400`, `401`, `404`, `409`) ou
-transiente (rede, timeout, `5xx`). A fila de sincronização consulta essa propriedade para
-decidir entre marcar a inspeção como `failed` ou mantê-la em `pending` para nova tentativa.
+Quatro blocs, todos onde existe decisão a tomar: autenticação, lista de ordens de serviço,
+formulário e sincronização.
 
-Manter a regra no tipo, e não numa cadeia de condicionais dentro do serviço de sync, torna
-a classificação testável isoladamente e impede divergência entre pontos de uso.
+**A fila não é um bloc.** `SyncService` vive fora da árvore de widgets, porque precisa
+rodar quando a conexão volta, independentemente da tela em que o técnico esteja. O
+`SyncBloc` apenas aciona e expõe o andamento.
 
-`UnknownFailure` é classificado como **transiente**: um erro não previsto não deveria
-condenar permanentemente um registro do técnico. O teto de tentativas da fila é o que
-impede reenvio infinito.
-
-### Modelagem de estados de autenticação
-
-A mensagem de erro vive **dentro** de `AuthUnauthenticated`, em vez de existir um estado
-`AuthFailure` separado.
-
-O motivo é o `Equatable`: o BLoC não reemite um estado igual ao anterior. Com estado
-separado, errar a senha duas vezes seguidas produziria dois `AuthFailure` idênticos e o
-segundo seria descartado — a mensagem não reapareceria. Com o erro dentro do estado, a
-transição passa por `AuthLoading` no meio, o que quebra a igualdade.
-
-`AuthLoading` é reservado ao login em andamento; a verificação de sessão na abertura usa
-`AuthInitial`. Isso mantém a tela de login montada durante a requisição, preservando o
-formulário e o listener que exibe o erro.
-
-### Sessão restaurada do disco
-
-`AuthRepository.restoreSession()` lê token e usuário do armazenamento seguro, sem consultar
-`GET /auth/me`. Num app de campo, exigir rede para restaurar sessão deixaria o técnico de
-fora justamente onde ele mais precisa entrar.
-
-### Cleartext HTTP apenas em debug
-
-A permissão `android:usesCleartextTraffic="true"` está em
-`android/app/src/debug/AndroidManifest.xml`, não no manifesto principal. O mock roda em
-HTTP puro, mas builds de release continuam exigindo HTTPS.
-
-### Carga inicial e refresh são eventos distintos
-
-`WorkOrdersRequested` e `WorkOrdersRefreshed` fazem a mesma chamada, mas a tela reage
-diferente: a carga inicial mostra spinner de tela cheia; o refresh mantém a lista visível
-e deixa o `RefreshIndicator` sinalizar. Com um evento único, o pull-to-refresh apagaria a
-lista por um instante a cada atualização.
-
-### Lista vazia não é um estado
-
-`WorkOrdersLoaded` com zero itens é um resultado válido, não uma situação distinta. Um
-estado `Empty` separado duplicaria a lógica de transição apenas para diferenciar "chegou
-uma lista" de "chegou uma lista sem itens". A tela decide o que desenhar.
-
-### Conclusão de operação ≠ mudança de estado
-
-O `RefreshIndicator` exige um `Future` que complete quando a atualização termina. A
-primeira implementação aguardava a próxima emissão do bloc — e travava.
-
-O motivo: o bloc descarta estados iguais ao atual. Um refresh que traz dados idênticos é
-uma operação concluída **sem** emissão, e o indicador girava indefinidamente. O bug só
-aparece com dados estáticos, que é justamente o caso do mock.
-
-A correção foi o evento carregar um `Completer`, completado pelo handler num `finally`.
-O indicador passa a acompanhar a operação, não o estado.
-
-### Valores desconhecidos de enum não derrubam o parsing
-
-`WorkOrderPriority` e `WorkOrderStatus` têm um caso `unknown` usado como fallback. Se a API
-devolver um valor não previsto, aquela OS aparece marcada como desconhecida em vez de
-quebrar a lista inteira. Num app de campo, mostrar dado parcial é preferível a mostrar
-tela de erro.
-
-Pelo mesmo motivo, coordenadas são lidas como `num` antes de virar `double`: JSON não
-distingue `-7` de `-7.0`, e `as double` falharia sobre um inteiro.
-
-### Rascunho incompleto é um estado válido do banco
-
-`photoPath`, `latitude`, `longitude` e `capturedAt` são anuláveis. Um rascunho é
-legitimamente incompleto: o técnico escreve a observação, sai do app e volta depois para
-capturar a foto. Se o esquema exigisse esses campos, salvar rascunho seria impossível.
-
-A validação acontece na transição para `pending`, não no esquema — a distinção entre o
-que o banco aceita guardar e o que a regra de negócio considera pronto para enviar.
-
-### Validação local antes de enfileirar
-
-As regras verificadas ao concluir são as mesmas do servidor: observação com no mínimo dez
-caracteres, foto e coordenadas obrigatórias.
-
-Deixar o servidor recusar também funcionaria, mas a inspeção entraria na fila, seria
-enviada, voltaria `400` e terminaria em `failed` — gastando rede por um erro previsível
-antes de sair do dispositivo. Pior: o técnico só descobriria ao recuperar sinal,
-possivelmente longe do ativo. Validando antes, o erro aparece com o poste ainda à frente.
-
-O `ValidationFailure` local usa o mesmo formato `campo → mensagens` que a API devolve num
-`400`, então a tela renderiza os dois sem saber de onde o erro veio.
-
-### Estado do backoff persistido na linha
-
-`retryCount` e `nextAttemptAt` são colunas, não variáveis do serviço de sincronização. Em
-memória, fechar o app zeraria o contador e o aparelho voltaria martelando a API. Na
-tabela, a fila retoma de onde parou — comportamento necessário num app sujeito a ser
-encerrado pelo sistema a qualquer momento.
-
-### Status gravado como texto
-
-`syncStatus` usa `textEnum`, gravando `"pending"` em vez de um inteiro. Custa alguns bytes
-e paga na inspeção do banco durante o desenvolvimento, onde o estado da fila é lido
-dezenas de vezes.
-
-### Foto no sistema de arquivos, caminho relativo no banco
-
-Blob de imagem incha o banco e degrada todas as consultas. O caminho é **relativo** ao
-diretório de documentos do app porque o container muda entre reinstalações no Android —
-um caminho absoluto salvo hoje pode apontar para lugar nenhum depois.
+**O histórico não tem bloc.** O Drift já expõe a lista como `Stream`, e o `StreamBuilder`
+cancela a assinatura anterior ao trocar de stream — o comportamento necessário na mudança
+de filtro. Um bloc ali seria repasse sem lógica.
 
 ### Classe do Drift usada como modelo de domínio
 
 A `Inspection` gerada é imutável, tem `copyWith` e igualdade por valor. Um modelo de
-domínio paralelo, com mapeamento nos dois sentidos, isolaria a apresentação da
-persistência — mas custaria cerca de 80 linhas para proteger contra uma troca de banco
-que não está no horizonte deste projeto.
+domínio paralelo isolaria a apresentação da persistência, mas custaria cerca de 80 linhas
+para proteger contra uma troca de banco que não está no horizonte deste projeto.
 
-O acoplamento é real e assumido. Num sistema com mais de uma fonte de dados para a mesma
+O acoplamento é assumido. Num sistema com mais de uma fonte de dados para a mesma
 entidade, a decisão se inverteria.
 
-### A foto é copiada do cache antes de ser referenciada
+### Status da ordem de serviço não é alterado pelo app
 
-O `image_picker` grava no diretório de cache do sistema, que o Android limpa quando
-precisa de espaço. Guardar aquele caminho faria a inspeção sobreviver ao fechamento do
-app, mas não a foto — e a falha apareceria dias depois, na sincronização, longe da causa.
+O contrato expõe apenas leitura de ordens de serviço — não há `PATCH` nem endpoint de
+transição. Alterar o `status` localmente seria pior do que não alterar: a próxima chamada
+a `GET /work-orders` traria o valor antigo de volta e o técnico veria o campo oscilar.
 
-A imagem é copiada para o diretório de documentos e o banco guarda um caminho **relativo**
-(`inspections/<uuid>.jpg`). Absoluto quebraria entre reinstalações, quando o container do
-app muda de lugar.
-
-Ao substituir uma foto, a anterior só é apagada **depois** que a nova está gravada no
-banco. Na ordem inversa, uma falha de escrita deixaria a inspeção sem foto alguma.
-
-### Os quatro modos de falha do GPS
-
-`LocationService` distingue serviço desligado, permissão negada, permissão negada
-permanentemente e ausência de sinal dentro do tempo limite. Cada um exige uma ação
-diferente do usuário, e só o terceiro é um beco sem saída: a partir da segunda recusa o
-Android para de exibir o diálogo e responde "negado" sem nenhum sinal visível.
-
-Por isso `LocationFailure` carrega `canOpenSettings`, e a mensagem correspondente oferece
-um atalho para as configurações do app. Sem essa distinção, o técnico tocaria no botão
-indefinidamente sem entender por que nada acontece.
-
-O `timeLimit` de 20 segundos cobre o quarto caso — técnico dentro de uma subestação, sem
-céu visível. Sem ele, a espera seria indefinida e indistinguível de um travamento.
-
-### Geofence avisa, não bloqueia
-
-Quando a posição capturada está a mais de 200 m do ponto da ordem de serviço, o campo de
-localização exibe a distância. A conclusão continua permitida.
-
-GPS impreciso é comum em campo, e travar o registro de quem está no local seria pior do
-que aceitar uma coordenada duvidosa com aviso visível. O cálculo fica na camada de
-apresentação por ser puramente informativo, derivado de dados que a tela já possui.
-
-### Estado único com status no formulário, estados separados na autenticação
-
-Os dois blocs usam padrões diferentes de propósito. O critério: **estados separados quando
-os dados são disjuntos, estado único com campo de status quando os mesmos dados persistem
-através das transições.**
-
-Em `AuthState`, `AuthAuthenticated` carrega usuário e `AuthLoading` não carrega nada —
-separar torna combinações impossíveis inexprimíveis. No formulário, `clientId` e rascunho
-existem em todos os momentos, e estados separados obrigariam a copiar os mesmos dados a
-cada transição.
+Em compensação, o card exibe um selo derivado das inspeções locais — "Inspeção: Pendente".
+É informação da qual o app é dono, e responde à pergunta real do técnico: *em quais destas
+eu já trabalhei?*
 
 ---
 
@@ -419,23 +366,17 @@ cada transição.
 - **A lista de ordens de serviço não é persistida localmente.** Sem conexão, a tela exibe
   erro em vez dos últimos dados conhecidos. Com mais tempo, o repositório serviria do banco
   local e a rede seria apenas atualização.
-- **Sem paginação.** O mock devolve cinco registros; uma carga real exigiria paginação ou
-  carregamento incremental.
-- **O token não é renovado.** A API mock não expõe refresh token, então a expiração leva
-  ao login. Em produção, um interceptor tentaria renovar antes de derrubar a sessão.
-- **Sem testes automatizados até o momento.**
 - **Um técnico por dispositivo.** O banco local não é segmentado por usuário: trocar de
   conta no mesmo aparelho expõe os rascunhos da sessão anterior, e uma inspeção
-  sincronizada por outro usuário seria atribuída a ele, já que o servidor grava
-  `createdBy` a partir do token de quem envia. A correção seria uma coluna de proprietário
-  filtrando as consultas — deliberadamente **não** limpando o banco no logout, o que
-  destruiria inspeções ainda não sincronizadas.
+  sincronizada por outro usuário seria atribuída a ele, já que o servidor grava `createdBy`
+  a partir do token de quem envia. A correção seria uma coluna de proprietário filtrando as
+  consultas — deliberadamente **não** limpando o banco no logout, o que destruiria
+  inspeções ainda não sincronizadas.
+- **O token não é renovado.** A API mock não expõe refresh token, então a expiração leva ao
+  login. Em produção, um interceptor tentaria renovar antes de derrubar a sessão.
+- **Sem paginação.** O mock devolve cinco registros; uma carga real exigiria paginação.
+- **Papéis não são usados.** O contrato prevê `field_technician` e `admin`, mas nenhuma
+  tela distingue os dois. Uma visão de supervisão exigiria endpoint que o mock não expõe.
 - **O mock não vincula ordens de serviço a técnicos.** `GET /work-orders` devolve a lista
   completa para qualquer token válido, enquanto `GET /inspections` filtra por `createdBy`.
   A assimetria é da API mock; o app exibe o que recebe.
-- **Fotos perdidas por encerramento do sistema não são recuperadas.** Se o Android matar o
-  app enquanto a câmera está em primeiro plano, o resultado da captura se perde. O
-  `image_picker` oferece `retrieveLostData()` para esse caso; não foi implementado.
-- **Papéis não são usados.** O contrato prevê `field_technician` e `admin`, e o `role` é
-  persistido no dispositivo, mas nenhuma tela distingue os dois. Uma visão de supervisão
-  exigiria endpoint e permissão que o mock não expõe.
