@@ -60,8 +60,7 @@ class LocationService {
     double startLng,
     double endLat,
     double endLng,
-  ) =>
-      Geolocator.distanceBetween(startLat, startLng, endLat, endLng);
+  ) => Geolocator.distanceBetween(startLat, startLng, endLat, endLng);
 
   Future<void> openSettings() => Geolocator.openAppSettings();
 }

@@ -15,10 +15,7 @@ class AuthRepository {
   static const _userKey = 'auth_user';
 
   /// Autentica e persiste sessão. Lança [Failure] em caso de erro.
-  Future<User> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<User> login({required String email, required String password}) async {
     final data = await _api.login(email: email, password: password);
 
     final token = data['accessToken'] as String;

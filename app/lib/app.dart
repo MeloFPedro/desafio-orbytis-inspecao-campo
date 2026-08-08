@@ -111,17 +111,17 @@ class _AuthGate extends StatelessWidget {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, state) => switch (state) {
         AuthInitial() => const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          ),
+          body: Center(child: CircularProgressIndicator()),
+        ),
         AuthLoading() || AuthUnauthenticated() => const LoginPage(),
         // O bloc nasce aqui dentro: é fechado no logout, junto com os dados
         // da sessão anterior.
         AuthAuthenticated() => BlocProvider(
-            create: (context) =>
-                WorkOrdersBloc(context.read<WorkOrdersRepository>())
-                  ..add(const WorkOrdersRequested()),
-            child: const WorkOrdersPage(),
-          ),
+          create: (context) =>
+              WorkOrdersBloc(context.read<WorkOrdersRepository>())
+                ..add(const WorkOrdersRequested()),
+          child: const WorkOrdersPage(),
+        ),
       },
     );
   }

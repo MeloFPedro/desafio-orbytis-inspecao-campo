@@ -32,7 +32,8 @@ class AuthInterceptor extends Interceptor {
     ResponseInterceptorHandler handler,
   ) {
     // Chega aqui, e não em onError, porque validateStatus aceita todo status.
-    final isSessionDead = response.statusCode == 401 &&
+    final isSessionDead =
+        response.statusCode == 401 &&
         !_isPublicRoute(response.requestOptions.path);
 
     if (isSessionDead) onUnauthorized();

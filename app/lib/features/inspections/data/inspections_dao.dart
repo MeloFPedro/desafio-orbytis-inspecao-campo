@@ -10,9 +10,9 @@ class InspectionsDao {
   /// Stream reativo: a tela de histórico se atualiza sozinha quando a fila
   /// muda o status de qualquer registro.
   Stream<List<Inspection>> watchAll() {
-    return (_db.select(_db.inspections)
-          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
-        .watch();
+    return (_db.select(
+      _db.inspections,
+    )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
   }
 
   Stream<List<Inspection>> watchByStatus(SyncStatus status) {
@@ -30,9 +30,9 @@ class InspectionsDao {
   }
 
   Future<Inspection?> findByClientId(String clientId) {
-    return (_db.select(_db.inspections)
-          ..where((t) => t.clientId.equals(clientId)))
-        .getSingleOrNull();
+    return (_db.select(
+      _db.inspections,
+    )..where((t) => t.clientId.equals(clientId))).getSingleOrNull();
   }
 
   /// Rascunho aberto de uma OS, se houver. O técnico retoma de onde parou
@@ -74,11 +74,11 @@ class InspectionsDao {
   }
 
   int _attentionRank(SyncStatus status) => switch (status) {
-        SyncStatus.synced => 0,
-        SyncStatus.draft => 1,
-        SyncStatus.pending => 2,
-        SyncStatus.failed => 3,
-      };
+    SyncStatus.synced => 0,
+    SyncStatus.draft => 1,
+    SyncStatus.pending => 2,
+    SyncStatus.failed => 3,
+  };
 
   /// Insere ou substitui — usado para gravar rascunho.
   Future<void> save(InspectionsCompanion entry) {
@@ -87,9 +87,9 @@ class InspectionsDao {
 
   /// Atualiza apenas as colunas presentes no companion.
   Future<void> updateFields(String clientId, InspectionsCompanion changes) {
-    return (_db.update(_db.inspections)
-          ..where((t) => t.clientId.equals(clientId)))
-        .write(changes);
+    return (_db.update(
+      _db.inspections,
+    )..where((t) => t.clientId.equals(clientId))).write(changes);
   }
 
   /// A fila: apenas `pending` cujo backoff já venceu.

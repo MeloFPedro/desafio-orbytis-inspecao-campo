@@ -27,9 +27,9 @@ class WorkOrdersPage extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'Histórico',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SyncHistoryPage()),
-            ),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SyncHistoryPage())),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -41,9 +41,9 @@ class WorkOrdersPage extends StatelessWidget {
       ),
       body: BlocBuilder<WorkOrdersBloc, WorkOrdersState>(
         builder: (context, state) => switch (state) {
-          WorkOrdersInitial() ||
-          WorkOrdersLoading() =>
-            const Center(child: CircularProgressIndicator()),
+          WorkOrdersInitial() || WorkOrdersLoading() => const Center(
+            child: CircularProgressIndicator(),
+          ),
           WorkOrdersError(:final message) => _ErrorView(message: message),
           WorkOrdersLoaded(:final items) => _LoadedView(items: items),
         },
@@ -62,9 +62,9 @@ class _LoadedView extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: () {
         final completer = Completer<void>();
-        context
-            .read<WorkOrdersBloc>()
-            .add(WorkOrdersRefreshed(completer: completer));
+        context.read<WorkOrdersBloc>().add(
+          WorkOrdersRefreshed(completer: completer),
+        );
         return completer.future;
       },
       child: items.isEmpty
@@ -119,9 +119,9 @@ class _ErrorView extends StatelessWidget {
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: () => context
-                  .read<WorkOrdersBloc>()
-                  .add(const WorkOrdersRequested()),
+              onPressed: () => context.read<WorkOrdersBloc>().add(
+                const WorkOrdersRequested(),
+              ),
               child: const Text('Tentar novamente'),
             ),
           ],
@@ -141,11 +141,11 @@ class _WorkOrderCard extends StatelessWidget {
   final SyncStatus? inspectionStatus;
 
   Color _priorityColor(BuildContext context) => switch (order.priority) {
-        WorkOrderPriority.high => Colors.red.shade700,
-        WorkOrderPriority.medium => Colors.orange.shade700,
-        WorkOrderPriority.low => Colors.green.shade700,
-        WorkOrderPriority.unknown => Theme.of(context).disabledColor,
-      };
+    WorkOrderPriority.high => Colors.red.shade700,
+    WorkOrderPriority.medium => Colors.orange.shade700,
+    WorkOrderPriority.low => Colors.green.shade700,
+    WorkOrderPriority.unknown => Theme.of(context).disabledColor,
+  };
 
   @override
   Widget build(BuildContext context) {

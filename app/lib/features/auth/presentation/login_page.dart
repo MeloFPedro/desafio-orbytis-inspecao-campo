@@ -28,11 +28,11 @@ class _LoginPageState extends State<LoginPage> {
     if (!_formKey.currentState!.validate()) return;
 
     context.read<AuthBloc>().add(
-          AuthLoginRequested(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
-          ),
-        );
+      AuthLoginRequested(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      ),
+    );
   }
 
   @override
@@ -44,7 +44,8 @@ class _LoginPageState extends State<LoginPage> {
             padding: const EdgeInsets.all(24),
             child: BlocConsumer<AuthBloc, AuthState>(
               listenWhen: (previous, current) =>
-                  current is AuthUnauthenticated && current.errorMessage != null,
+                  current is AuthUnauthenticated &&
+                  current.errorMessage != null,
               listener: (context, state) {
                 final message = (state as AuthUnauthenticated).errorMessage!;
                 ScaffoldMessenger.of(context)
@@ -77,8 +78,8 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         validator: (value) =>
                             (value == null || value.trim().isEmpty)
-                                ? 'Informe o e-mail'
-                                : null,
+                            ? 'Informe o e-mail'
+                            : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -103,7 +104,9 @@ class _LoginPageState extends State<LoginPage> {
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Text('Entrar'),
                       ),

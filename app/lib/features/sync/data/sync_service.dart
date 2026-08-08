@@ -33,8 +33,13 @@ class SyncResult extends Equatable {
   int get processed => synced + failed + retryScheduled;
 
   @override
-  List<Object?> get props =>
-      [synced, failed, retryScheduled, skipped, sessionExpired];
+  List<Object?> get props => [
+    synced,
+    failed,
+    retryScheduled,
+    skipped,
+    sessionExpired,
+  ];
 }
 
 /// Percorre a fila de inspeções `pending` e as envia à API.
@@ -205,8 +210,7 @@ class SyncService {
       inspection.clientId,
       InspectionsCompanion(
         syncStatus: const Value(SyncStatus.failed),
-        retryCount:
-            attempts == null ? const Value.absent() : Value(attempts),
+        retryCount: attempts == null ? const Value.absent() : Value(attempts),
         lastError: Value(message),
         nextAttemptAt: const Value<DateTime?>(null),
         updatedAt: Value(DateTime.now()),

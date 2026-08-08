@@ -66,36 +66,36 @@ class _InspectionFormViewState extends State<_InspectionFormView> {
   }
 
   void _saveDraft(BuildContext context) => _dispatch(
-        context,
-        () => InspectionDraftSaved(
-          observation: _observationController.text,
-          condition: _condition,
-        ),
-      );
+    context,
+    () => InspectionDraftSaved(
+      observation: _observationController.text,
+      condition: _condition,
+    ),
+  );
 
   void _complete(BuildContext context) => _dispatch(
-        context,
-        () => InspectionCompleteRequested(
-          observation: _observationController.text,
-          condition: _condition,
-        ),
-      );
+    context,
+    () => InspectionCompleteRequested(
+      observation: _observationController.text,
+      condition: _condition,
+    ),
+  );
 
   void _capturePhoto(BuildContext context) => _dispatch(
-        context,
-        () => InspectionPhotoRequested(
-          observation: _observationController.text,
-          condition: _condition,
-        ),
-      );
+    context,
+    () => InspectionPhotoRequested(
+      observation: _observationController.text,
+      condition: _condition,
+    ),
+  );
 
   void _captureLocation(BuildContext context) => _dispatch(
-        context,
-        () => InspectionLocationRequested(
-          observation: _observationController.text,
-          condition: _condition,
-        ),
-      );
+    context,
+    () => InspectionLocationRequested(
+      observation: _observationController.text,
+      condition: _condition,
+    ),
+  );
 
   void _showMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -120,11 +120,11 @@ class _InspectionFormViewState extends State<_InspectionFormView> {
     final coords = '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
 
     final distance = context.read<LocationService>().distanceBetween(
-          widget.workOrder.latitude,
-          widget.workOrder.longitude,
-          lat,
-          lng,
-        );
+      widget.workOrder.latitude,
+      widget.workOrder.longitude,
+      lat,
+      lng,
+    );
 
     if (distance > _geofenceRadiusMeters) {
       return '$coords — ${distance.toStringAsFixed(0)} m do ponto da OS';
@@ -373,7 +373,8 @@ class _CaptureTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       onTap: onTap,
-      leading: leadingPreview ??
+      leading:
+          leadingPreview ??
           Icon(icon, color: hasError ? theme.colorScheme.error : null),
       title: Text(label),
       subtitle: Text(

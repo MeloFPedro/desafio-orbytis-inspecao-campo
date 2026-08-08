@@ -315,8 +315,9 @@ class _InspectionCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 inspection.lastError!,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
             ],
             if (attemptsLabel != null) ...[
@@ -331,9 +332,9 @@ class _InspectionCard extends StatelessWidget {
                   icon: const Icon(Icons.refresh),
                   label: const Text('Tentar novamente'),
                   onPressed: () async {
-                    await context
-                        .read<InspectionsRepository>()
-                        .retry(inspection.clientId);
+                    await context.read<InspectionsRepository>().retry(
+                      inspection.clientId,
+                    );
                     if (context.mounted) {
                       context.read<SyncBloc>().add(const SyncRequested());
                     }
@@ -347,4 +348,3 @@ class _InspectionCard extends StatelessWidget {
     );
   }
 }
-

@@ -38,7 +38,9 @@ Failure mapHttpError(int status, dynamic body) {
 }
 
 String? _extractMessage(dynamic body) {
-  if (body is Map && body['message'] is String) return body['message'] as String;
+  if (body is Map && body['message'] is String) {
+    return body['message'] as String;
+  }
   return null;
 }
 

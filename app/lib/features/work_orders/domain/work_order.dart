@@ -13,9 +13,9 @@ enum WorkOrderPriority {
 
   /// Valor desconhecido não derruba o parsing: vira [unknown].
   static WorkOrderPriority fromApi(String? value) => values.firstWhere(
-        (item) => item.apiValue == value,
-        orElse: () => unknown,
-      );
+    (item) => item.apiValue == value,
+    orElse: () => unknown,
+  );
 }
 
 enum WorkOrderStatus {
@@ -30,9 +30,9 @@ enum WorkOrderStatus {
   final String label;
 
   static WorkOrderStatus fromApi(String? value) => values.firstWhere(
-        (item) => item.apiValue == value,
-        orElse: () => unknown,
-      );
+    (item) => item.apiValue == value,
+    orElse: () => unknown,
+  );
 }
 
 class WorkOrder extends Equatable {

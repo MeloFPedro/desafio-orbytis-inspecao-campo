@@ -10,8 +10,8 @@ import 'package:uuid/uuid.dart';
 /// síncrono — a UI precisa do caminho absoluto durante o build.
 class PhotoService {
   PhotoService(this._documentsPath, {ImagePicker? picker, Uuid? uuid})
-      : _picker = picker ?? ImagePicker(),
-        _uuid = uuid ?? const Uuid();
+    : _picker = picker ?? ImagePicker(),
+      _uuid = uuid ?? const Uuid();
 
   static const folder = 'inspections';
 

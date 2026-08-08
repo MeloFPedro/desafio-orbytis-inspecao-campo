@@ -19,8 +19,9 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     on<SyncSessionStarted>((event, emit) => _run(emit, force: true));
 
     _connectivitySubscription = connectivity?.listen((results) {
-      final hasNetwork =
-          results.any((result) => result != ConnectivityResult.none);
+      final hasNetwork = results.any(
+        (result) => result != ConnectivityResult.none,
+      );
 
       // Gatilho, não garantia: "tem Wi-Fi" não é "tem internet". Se a
       // tentativa falhar, o backoff cuida do resto.

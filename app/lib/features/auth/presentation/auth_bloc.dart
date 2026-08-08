@@ -9,14 +9,15 @@ import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc(this._repository, {Stream<void>? sessionExpired})
-      : super(const AuthInitial()) {
+    : super(const AuthInitial()) {
     on<AuthStatusChecked>(_onStatusChecked);
     on<AuthLoginRequested>(_onLoginRequested);
     on<AuthLogoutRequested>(_onLogoutRequested);
 
     // O interceptor anuncia 401 em rota protegida; a sessão cai aqui.
-    _sessionSubscription =
-        sessionExpired?.listen((_) => add(const AuthLogoutRequested()));
+    _sessionSubscription = sessionExpired?.listen(
+      (_) => add(const AuthLogoutRequested()),
+    );
   }
 
   final AuthRepository _repository;

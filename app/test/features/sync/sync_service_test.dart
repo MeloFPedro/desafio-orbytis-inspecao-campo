@@ -193,8 +193,7 @@ class _FakeDao implements InspectionsDao {
   Future<List<Inspection>> dueForSync(
     DateTime now, {
     bool ignoreBackoff = false,
-  }) async =>
-      queue;
+  }) async => queue;
 
   @override
   Future<void> updateFields(

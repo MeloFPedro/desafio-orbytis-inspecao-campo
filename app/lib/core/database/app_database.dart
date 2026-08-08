@@ -20,11 +20,11 @@ enum SyncStatus {
 
 extension SyncStatusLabel on SyncStatus {
   String get label => switch (this) {
-        SyncStatus.draft => 'Rascunho',
-        SyncStatus.pending => 'Pendente',
-        SyncStatus.synced => 'Sincronizada',
-        SyncStatus.failed => 'Falhou',
-      };
+    SyncStatus.draft => 'Rascunho',
+    SyncStatus.pending => 'Pendente',
+    SyncStatus.synced => 'Sincronizada',
+    SyncStatus.failed => 'Falhou',
+  };
 }
 
 class Inspections extends Table {
@@ -73,7 +73,7 @@ class AppDatabase extends _$AppDatabase {
   /// Sem argumento, abre o arquivo real no diretório do app.
   /// Testes passam `NativeDatabase.memory()`.
   AppDatabase([QueryExecutor? executor])
-      : super(executor ?? driftDatabase(name: 'inspecao_campo'));
+    : super(executor ?? driftDatabase(name: 'inspecao_campo'));
 
   @override
   int get schemaVersion => 1;
