@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/media/photo_service.dart';
 import '../../inspections/data/inspections_repository.dart';
 import '../../inspections/presentation/inspection_status_chip.dart';
 import '../data/sync_service.dart';
@@ -184,6 +187,50 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
+/// Miniatura da evidência, ou um marcador quando não há foto.
+///
+/// Rascunhos legitimamente não têm foto, e uma inspeção sincronizada pode ter
+/// perdido o arquivo — em ambos os casos o card continua legível.
+class _PhotoThumbnail extends StatelessWidget {
+  const _PhotoThumbnail({required this.relativePath});
+
+  static const _size = 64.0;
+
+  final String? relativePath;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final path = relativePath;
+
+    if (path == null) return _placeholder(theme, Icons.image_not_supported);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.file(
+        File(context.read<PhotoService>().resolve(path)),
+        width: _size,
+        height: _size,
+        fit: BoxFit.cover,
+        // O arquivo pode ter sido removido do dispositivo.
+        errorBuilder: (_, _, _) => _placeholder(theme, Icons.broken_image),
+      ),
+    );
+  }
+
+  Widget _placeholder(ThemeData theme, IconData icon) {
+    return Container(
+      width: _size,
+      height: _size,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, size: 24, color: theme.disabledColor),
+    );
+  }
+}
+
 class _InspectionCard extends StatelessWidget {
   const _InspectionCard({required this.inspection});
 
@@ -228,12 +275,41 @@ class _InspectionCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Text(
-              inspection.observation.isEmpty
-                  ? '(sem observação)'
-                  : inspection.observation,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _PhotoThumbnail(relativePath: inspection.photoPath),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        inspection.observation.isEmpty
+                            ? '(sem observação)'
+                            : inspection.observation,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (inspection.condition != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Condição: ${inspection.condition}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                      if (inspection.latitude != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${inspection.latitude!.toStringAsFixed(5)}, '
+                          '${inspection.longitude!.toStringAsFixed(5)}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
             if (inspection.lastError != null) ...[
               const SizedBox(height: 8),
