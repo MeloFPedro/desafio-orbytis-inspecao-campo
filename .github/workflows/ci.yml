@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        # O app é um subprojeto: os comandos do Flutter precisam rodar onde
+        # está o pubspec.yaml.
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.x
+          cache: true
+
+      - name: Instalar dependências
+        run: flutter pub get
+
+      # Restrito ao código-fonte: `.` entraria em build/, onde o Gradle deixa
+      # artefatos com caminhos longos demais para alguns sistemas de arquivos.
+      - name: Verificar formatação
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Análise estática
+        run: flutter analyze
+
+      - name: Testes
+        run: flutter test
