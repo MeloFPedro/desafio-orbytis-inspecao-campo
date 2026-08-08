@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/error/failures.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/media/photo_service.dart';
+import '../../sync/presentation/sync_bloc.dart';
+import '../../sync/presentation/sync_event.dart';
 import '../../work_orders/domain/work_order.dart';
 import '../data/inspections_repository.dart';
 import 'inspection_form_bloc.dart';
@@ -135,6 +137,11 @@ class _InspectionFormViewState extends State<_InspectionFormView> {
       case InspectionFormStatus.draftSaved:
         _showMessage(context, 'Rascunho salvo.');
       case InspectionFormStatus.completed:
+        // Momento mais natural para tentar enviar: o trabalho acabou de ser
+        // feito. Não força o backoff — concluir não é informação nova sobre a
+        // rede. Despachado antes do pop, enquanto o contexto ainda é válido.
+        context.read<SyncBloc>().add(const SyncAutoTriggered());
+
         // Pop antes da mensagem: assim quem a exibe é o ScaffoldMessenger da
         // tela de baixo, e ela não some junto com esta.
         Navigator.of(context).pop();
