@@ -278,6 +278,7 @@ class _WorkOrderHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final notes = workOrder.notes;
 
     return Card(
       child: Padding(
@@ -291,6 +292,52 @@ class _WorkOrderHeader extends StatelessWidget {
             if (workOrder.description.isNotEmpty) ...[
               const SizedBox(height: 10),
               Text(workOrder.description, style: theme.textTheme.bodySmall),
+            ],
+            // Observações do backoffice costumam trazer alerta de segurança
+            // ("área com pedestres") ou contexto que muda a leitura do ativo
+            // ("retorno de visita anterior"). Destacadas por isso.
+            if (notes != null && notes.trim().isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: theme.colorScheme.onSecondaryContainer,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Observações da OS',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSecondaryContainer,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            notes,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSecondaryContainer,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ],
         ),
