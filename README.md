@@ -1,5 +1,7 @@
 # Inspeção de Campo — Desafio Técnico Orbytis
 
+[![CI](https://github.com/MeloFPedro/desafio-orbytis-inspecao-campo/actions/workflows/ci.yml/badge.svg)](https://github.com/MeloFPedro/desafio-orbytis-inspecao-campo/actions/workflows/ci.yml)
+
 Mini app Flutter de inspeção de campo com persistência local e sincronização offline-first.
 
 Um técnico faz login, consulta suas ordens de serviço, registra uma inspeção com foto e
@@ -26,6 +28,7 @@ GPS, salva localmente e sincroniza com a API quando há conexão.
 | `GET /work-orders` com título, endereço, prioridade e status | `features/work_orders` |
 | Estados de carregando, vazio e erro | `WorkOrdersState` |
 | Pull-to-refresh | `WorkOrdersPage` |
+| Detalhe da OS com descrição e observações do backoffice | cabeçalho do formulário |
 | Formulário com observação, foto e localização | `features/inspections` |
 | Salvar rascunho / Concluir inspeção | `InspectionsRepository` |
 | Banco local sobrevivendo ao encerramento do app | Drift, tabela `inspections` |
@@ -51,9 +54,9 @@ GPS, salva localmente e sincroniza com a API quando há conexão.
 | Requisito | Situação |
 |---|---|
 | Geofence de 200 m | **implementado** — avisa a distância, sem bloquear |
-| Campos dinâmicos via `form-schema` | não implementado |
+| CI básico | **implementado** — formatação, análise estática e testes no GitHub Actions |
+| Campos dinâmicos via `form-schema` | não implementado — ver Limitações |
 | Dark mode | não implementado |
-| CI básico | não implementado |
 
 ---
 
@@ -525,6 +528,11 @@ decide gravar**, que é exatamente a lógica em questão.
   fica desabilitado, e se o `image_picker` não retornar não há como cancelar.
 - **Cobertura de testes concentrada na fila.** Blocs e camada de dados não têm testes; a
   prioridade foi a lógica com maior risco de regressão silenciosa.
+- **Campos dinâmicos não implementados.** `GET /work-orders/:id/form-schema` existe no
+  contrato, mas o mock devolve o mesmo esquema para qualquer ordem de serviço — os quatro
+  campos estão fixos no `server.js`. Um renderizador dinâmico demonstraria flexibilidade
+  que os dados não exercitam, ao custo de reescrever um formulário já verificado. Com mais
+  tempo, seria o próximo passo, junto de um mock que variasse o esquema por tipo de ativo.
 - **Sem paginação.** O mock devolve cinco registros; uma carga real exigiria paginação ou
   carregamento incremental.
 - **Papéis não são usados.** O contrato prevê `field_technician` e `admin`, e o `role` é
